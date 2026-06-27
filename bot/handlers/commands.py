@@ -528,4 +528,96 @@ async def cmd_task(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await thinking.edit_text(f"❌ Ошибка: {e}")
 
 
+async def cmd_submit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    /submit <url> [описание] — Submit a project URL for AI analysis.
+    Full pipeline: fetch → analyze (score 0-100) → generate proposal → send to Telegram for approval.
+    """
+    if not context.args:
+        await update.message.reply_text(
+            "📌 <b>Добавить проект для анализа</b>\n\n"
+            "Использование: <code>/submit &lt;url&gt;</code>\n\n"
+            "Примеры:\n"
+            "• <code>/submit https://www.upwork.com/jobs/~01abc123</code>\n"
+            "• <code>/submit https://www.fl.ru/projects/12345678/</code>\n\n"
+            "AI сам зайдёт на страницу, проанализирует проект, поставит скор 0-100 и напишет отклик.\n"
+            "Ты получишь запрос на подтверждение перед любым действием.",
+            parse_mode="HTML",
+        )
+        return
+
+    url = context.args[0]
+    description = " ".join(context.args[1:]) if len(context.args) > 1 else ""
+
+    if not url.startswith("http"):
+        await update.message.reply_text("URL должен начинаться с http:// или https://")
+        return
+
+    thinking = await update.message.reply_text(
+        f"📌 <b>Анализирую проект...</b>\n\n"
+        f"🔗 {url[:60]}\n\n"
+        f"⏳ Шаги: загрузка → AI анализ → скоринг → генерация отклика",
+        parse_mode="HTML",
+    )
+
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{API_BASE}/api/opportunities/submit",
+                json={"url": url, "description": description},
+                timeout=90,
+            )
+            r.raise_for_status()
+            data = r.json()
+
+        d = data.get("data", {})
+        score = d.get("score", 0)
+        opp_id = d.get("opportunity_id")
+        result_text = data.get("result", "")
+
+        if score and score >= 60:
+            icon = "⭐" if score >= 80 else "✅"
+            text = (
+                f"{icon} <b>Проект проанализирован!</b>\n\n"
+                f"⭐ Скор: <b>{score}/100</b>\n"
+                f"💡 {result_text}\n\n"
+                f"Отклик создан и отправлен на подтверждение в Approvals."
+            )
+        elif score and score < 40:
+            text = (
+                f"⚠️ <b>Проект не подходит</b>\n\n"
+                f"Скор: <b>{score}/100</b>\n"
+                f"💡 {result_text}"
+            )
+        else:
+            text = f"📊 <b>Готово</b>\n\n{result_text}"
+
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        kb = None
+        if opp_id:
+            kb = InlineKeyboardMarkup([[
+                InlineKeyboardButton("📋 Открыть проект", callback_data=f"menu:earn:opp:{opp_id}"),
+                InlineKeyboardButton("💰 Все проекты", callback_data="menu:earn:opps"),
+            ]])
+
+        await thinking.edit_text(text, parse_mode="HTML", reply_markup=kb)
+
+    except asyncio.TimeoutError:
+        await thinking.edit_text("⏱ Таймаут. Анализ идёт в фоне — проверь /earn через минуту.")
+    except Exception as e:
+        await thinking.edit_text(f"❌ Ошибка: {e}")
+
+
+async def cmd_earn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /earn — show earning dashboard."""
+    from bot.handlers.menu import show_earn
+    await show_earn(update, context)
+
+
+async def cmd_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /leads — show leads list."""
+    from bot.handlers.menu import show_leads
+    await show_leads(update, context)
+
+
 import asyncio

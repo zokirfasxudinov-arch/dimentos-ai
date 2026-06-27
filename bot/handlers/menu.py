@@ -25,23 +25,26 @@ API_BASE = f"http://localhost:{settings.api_port}"
 def kb_main() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🟢 Состояние системы", callback_data="menu:status"),
-            InlineKeyboardButton("📋 Задачи",            callback_data="menu:tasks"),
+            InlineKeyboardButton("💰 Заработок",         callback_data="menu:earn"),
+            InlineKeyboardButton("🟢 Состояние",         callback_data="menu:status"),
         ],
         [
             InlineKeyboardButton("🤖 AI-агенты",         callback_data="menu:agents"),
             InlineKeyboardButton("✅ Подтверждения",     callback_data="menu:approvals"),
         ],
         [
+            InlineKeyboardButton("📋 Задачи",            callback_data="menu:tasks"),
             InlineKeyboardButton("📁 Проекты",           callback_data="menu:projects"),
+        ],
+        [
             InlineKeyboardButton("🧠 Память",            callback_data="menu:memory"),
-        ],
-        [
             InlineKeyboardButton("🔗 GitHub",            callback_data="menu:github"),
-            InlineKeyboardButton("📜 Логи",              callback_data="menu:logs"),
         ],
         [
+            InlineKeyboardButton("📜 Логи",              callback_data="menu:logs"),
             InlineKeyboardButton("⚙️ Настройки",        callback_data="menu:settings"),
+        ],
+        [
             InlineKeyboardButton("❓ Помощь",            callback_data="menu:help"),
         ],
     ])
@@ -855,6 +858,29 @@ async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         else:
             await show_settings(update, context)
 
+    elif section == "earn":
+        sub = parts[2] if len(parts) > 2 else None
+        if sub == "opps":
+            await show_opportunities(update, context)
+        elif sub == "opp" and len(parts) >= 4:
+            await show_opportunity_detail(update, context, parts[3])
+        elif sub == "analyze" and len(parts) >= 4:
+            await _handle_analyze(update, context, parts[3])
+        elif sub == "propose" and len(parts) >= 4:
+            await _handle_opportunity_propose(update, context, parts[3])
+        elif sub == "payments":
+            await show_payments(update, context)
+        elif sub == "leads":
+            await show_leads(update, context)
+        elif sub == "lead" and len(parts) >= 4:
+            await show_lead_detail(update, context, parts[3])
+        elif sub == "search":
+            await _handle_lead_search(update, context)
+        elif sub == "earnings":
+            await show_earnings(update, context)
+        else:
+            await show_earn(update, context)
+
     elif section == "help":
         await show_help(update, context)
 
@@ -881,6 +907,370 @@ async def show_memory_recent(update: Update, context: ContextTypes.DEFAULT_TYPE)
         [InlineKeyboardButton("⬅️ Память", callback_data="menu:memory")],
         kb_back_row(),
     ]))
+
+
+async def show_earn(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Earnings dashboard."""
+    stats = await _get("/api/opportunities/stats")
+    payments = await _get("/api/payments")
+
+    if stats:
+        by_status = stats.get("by_status", {})
+        total_earned = stats.get("total_earned_usd", 0)
+        total_pending = stats.get("total_pending_usd", 0)
+
+        status_icons = {
+            "NEW_FOUND": "🆕", "ANALYZED": "🔍", "GOOD_FIT": "⭐",
+            "PROPOSAL_DRAFTED": "📝", "WAITING_APPROVAL": "⏳",
+            "PROPOSAL_SENT": "📤", "CLIENT_REPLIED": "💬",
+            "NEGOTIATION": "🤝", "ACCEPTED": "✅", "IN_PROGRESS": "🔨",
+            "QA": "🧪", "DELIVERY_READY": "📦", "DELIVERED": "🚀",
+            "PAID": "💰", "ARCHIVED": "🗄",
+        }
+
+        active_statuses = ["NEW_FOUND", "GOOD_FIT", "PROPOSAL_DRAFTED",
+                           "WAITING_APPROVAL", "PROPOSAL_SENT", "NEGOTIATION",
+                           "ACCEPTED", "IN_PROGRESS"]
+        active_count = sum(by_status.get(s, 0) for s in active_statuses)
+
+        lines = [
+            "💰 <b>Earn Dashboard</b>\n",
+            f"📊 Всего проектов: <b>{stats.get('total', 0)}</b>",
+            f"🔥 Активных: <b>{active_count}</b>",
+            f"⭐ Средний скор: <b>{stats.get('avg_score', 0)}/100</b>",
+            f"\n💵 Заработано: <b>${total_earned:.2f}</b>",
+            f"⏳ Ожидает оплаты: <b>${total_pending:.2f}</b>",
+        ]
+        if by_status.get("GOOD_FIT"):
+            lines.append(f"\n⭐ Хороших проектов: <b>{by_status['GOOD_FIT']}</b> — готовы к отклику")
+        if by_status.get("WAITING_APPROVAL"):
+            lines.append(f"⏳ Ждут подтверждения: <b>{by_status['WAITING_APPROVAL']}</b>")
+        text = "\n".join(lines)
+    else:
+        text = "💰 <b>Earn Dashboard</b>\n\nСтатистика недоступна."
+
+    kb = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📋 Все проекты",   callback_data="menu:earn:opps"),
+            InlineKeyboardButton("💵 Оплаты",        callback_data="menu:earn:payments"),
+        ],
+        [
+            InlineKeyboardButton("🔍 Поиск лидов",  callback_data="menu:earn:search"),
+            InlineKeyboardButton("📌 Лиды (RSS)",   callback_data="menu:earn:leads"),
+        ],
+        kb_back_row(),
+    ])
+    await _reply(update, text, kb)
+
+
+async def show_leads(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show list of scored leads."""
+    data = await _get("/api/leads?limit=20")
+    if not data:
+        await _reply(update, "❌ Лиды недоступны.", kb_back())
+        return
+
+    leads = data.get("leads", [])
+    if not leads:
+        await _reply(
+            update,
+            "📋 <b>Лиды</b>\n\nПока нет лидов. Нажми «Найти заказы» чтобы начать поиск.",
+            InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔍 Найти заказы", callback_data="menu:earn:search")],
+                kb_back_row(),
+            ])
+        )
+        return
+
+    STATUS_ICONS = {
+        "new": "🆕", "scored": "⭐", "proposal_ready": "📝",
+        "sent": "📤", "negotiating": "🤝", "won": "🏆", "lost": "❌",
+    }
+
+    lines = [f"📋 <b>Лиды ({len(leads)})</b>\n"]
+    buttons = []
+    for lead in leads[:10]:
+        icon = STATUS_ICONS.get(lead["status"], "•")
+        score = f" {lead['ai_score']:.0f}/10" if lead.get("ai_score") else ""
+        title = lead["title"][:40]
+        lines.append(f"{icon}{score} {title}")
+        short_id = lead["id"][:8]
+        buttons.append([
+            InlineKeyboardButton(
+                f"{icon} {title[:30]}",
+                callback_data=f"menu:earn:lead:{lead['id']}"
+            )
+        ])
+
+    buttons.append(kb_back_row())
+    await _reply(update, "\n".join(lines), InlineKeyboardMarkup(buttons))
+
+
+async def show_lead_detail(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, lead_id: str
+) -> None:
+    data = await _get(f"/api/leads/{lead_id}")
+    if not data:
+        await _reply(update, "❌ Лид не найден.", kb_back())
+        return
+
+    score_str = f"{data['ai_score']:.0f}/10" if data.get("ai_score") else "не оценён"
+    proposal_preview = ""
+    if data.get("ai_proposal"):
+        proposal_preview = f"\n\n📝 <b>Отклик:</b>\n<code>{data['ai_proposal'][:300]}...</code>"
+
+    text = (
+        f"💼 <b>{data['title']}</b>\n\n"
+        f"📌 Источник: {data['source']}\n"
+        f"💰 Бюджет: {data.get('budget') or 'не указан'}\n"
+        f"⭐ Скор: {score_str}\n"
+        f"📊 Статус: {data['status']}\n"
+    )
+    if data.get("ai_analysis"):
+        text += f"\n💡 <i>{data['ai_analysis']}</i>"
+    if data.get("url"):
+        text += f"\n\n🔗 <a href=\"{data['url']}\">Открыть заказ</a>"
+    text += proposal_preview
+
+    has_proposal = bool(data.get("ai_proposal"))
+    kb = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "✏️ Сгенерировать отклик" if not has_proposal else "🔄 Обновить отклик",
+                callback_data=f"menu:earn:propose:{lead_id}"
+            ),
+        ],
+        [InlineKeyboardButton("⬅️ Все лиды", callback_data="menu:earn:leads")],
+        kb_back_row(),
+    ])
+    await _reply(update, text, kb)
+
+
+async def _handle_propose(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, lead_id: str
+) -> None:
+    """Generate proposal for a lead."""
+    await _reply(update, "⏳ Генерирую отклик через AI...", kb_back())
+    data = await _post(f"/api/leads/{lead_id}/propose", {})
+    if data and data.get("proposal"):
+        proposal = data["proposal"][:800]
+        text = f"📝 <b>Готовый отклик:</b>\n\n{proposal}"
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⬅️ К лиду", callback_data=f"menu:earn:lead:{lead_id}")],
+            kb_back_row(),
+        ])
+        await _reply(update, text, kb)
+    else:
+        await _reply(update, "❌ Не удалось сгенерировать отклик.", kb_back())
+
+
+async def _handle_lead_search(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    """Trigger background lead search."""
+    await _reply(update, "🔍 Запускаю поиск заказов...\n\nПроверяю fl.ru, freelance.ru, habr...", None)
+    data = await _post("/api/leads/search", {})
+    msg = "✅ Поиск запущен в фоне. Новые лиды появятся через 1-2 минуты." if data else "❌ Ошибка запуска."
+    await _reply(update, msg, InlineKeyboardMarkup([
+        [InlineKeyboardButton("📋 Смотреть лиды", callback_data="menu:earn:leads")],
+        kb_back_row(),
+    ]))
+
+
+async def show_earnings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show earning records."""
+    data = await _get("/api/earnings")
+    if not data:
+        await _reply(update, "❌ Данные недоступны.", kb_back())
+        return
+
+    records = data.get("earnings", [])
+    total = data.get("total_usd", 0)
+
+    if not records:
+        text = "💵 <b>Доходы</b>\n\nЗаписей о доходах пока нет.\n\nКогда выиграешь заказ — зафиксируй его через API:\n<code>POST /api/earnings</code>"
+    else:
+        lines = [f"💵 <b>Доходы (итого: ${total:.2f})</b>\n"]
+        for r in records[:10]:
+            lines.append(f"  • {r['client']} — ${r['amount_usd']:.2f} ({r['service'][:30]})")
+        text = "\n".join(lines)
+
+    await _reply(update, text, kb_back())
+
+
+async def show_opportunities(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """CRM opportunity list."""
+    data = await _get("/api/opportunities?limit=20")
+    if not data:
+        await _reply(update, "❌ CRM недоступен.", kb_back())
+        return
+
+    opps = data.get("opportunities", [])
+    if not opps:
+        text = (
+            "📋 <b>Проекты (CRM)</b>\n\n"
+            "Проектов пока нет.\n\n"
+            "Добавь проект командой:\n"
+            "<code>/submit https://upwork.com/...</code>"
+        )
+        await _reply(update, text, InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔍 Найти заказы", callback_data="menu:earn:search")],
+            kb_back_row(),
+        ]))
+        return
+
+    STATUS_ICONS = {
+        "NEW_FOUND": "🆕", "ANALYZED": "🔍", "GOOD_FIT": "⭐",
+        "PROPOSAL_DRAFTED": "📝", "WAITING_APPROVAL": "⏳",
+        "PROPOSAL_SENT": "📤", "CLIENT_REPLIED": "💬", "NEGOTIATION": "🤝",
+        "ACCEPTED": "✅", "IN_PROGRESS": "🔨", "QA": "🧪",
+        "DELIVERED": "🚀", "PAID": "💰", "ARCHIVED": "🗄",
+    }
+
+    buttons = []
+    for opp in opps[:12]:
+        icon = STATUS_ICONS.get(opp["status"], "•")
+        score_str = f" {opp['score']:.0f}" if opp.get("score") else ""
+        label = f"{icon}{score_str} {opp['title'][:35]}"
+        buttons.append([InlineKeyboardButton(label, callback_data=f"menu:earn:opp:{opp['id']}")])
+
+    buttons.append(kb_back_row())
+    text = f"📋 <b>Проекты ({len(opps)})</b>\n\nСкор | Статус | Название"
+    await _reply(update, text, InlineKeyboardMarkup(buttons))
+
+
+async def show_opportunity_detail(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, opp_id: str
+) -> None:
+    data = await _get(f"/api/opportunities/{opp_id}")
+    if not data:
+        await _reply(update, "❌ Проект не найден.", kb_back())
+        return
+
+    score = data.get("score")
+    score_str = f"{score:.0f}/100" if score else "не оценён"
+    score_bar = ""
+    if score:
+        filled = int(score / 10)
+        score_bar = "█" * filled + "░" * (10 - filled)
+
+    price_str = ""
+    if data.get("pricing_normal"):
+        price_str = (
+            f"\n💵 Цены: от ${data.get('pricing_min', '?'):.0f} | "
+            f"${data['pricing_normal']:.0f} | "
+            f"${data.get('pricing_premium', '?'):.0f} premium"
+        )
+
+    proposal_preview = ""
+    if data.get("ai_proposal"):
+        proposal_preview = f"\n\n📝 <b>Отклик:</b>\n<i>{data['ai_proposal'][:300]}...</i>"
+
+    text = (
+        f"💼 <b>{data['title']}</b>\n\n"
+        f"📌 Источник: {data['source']}\n"
+        f"📊 Статус: <b>{data['status']}</b>\n"
+        f"⭐ Скор: <b>{score_str}</b> {score_bar}\n"
+        f"💰 Бюджет: {data.get('budget_raw') or 'не указан'}"
+        f"{price_str}"
+    )
+    if data.get("ai_analysis"):
+        text += f"\n\n💡 <i>{data['ai_analysis']}</i>"
+    if data.get("source_url"):
+        text += f"\n\n🔗 <a href=\"{data['source_url']}\">Открыть проект</a>"
+    text += proposal_preview
+
+    has_proposal = bool(data.get("ai_proposal"))
+    has_analysis = bool(data.get("ai_analysis"))
+
+    rows = []
+    if not has_analysis:
+        rows.append([InlineKeyboardButton("🔍 Анализировать", callback_data=f"menu:earn:analyze:{opp_id}")])
+    if has_analysis and not has_proposal:
+        rows.append([InlineKeyboardButton("📝 Написать отклик", callback_data=f"menu:earn:propose:{opp_id}")])
+    if has_proposal:
+        rows.append([InlineKeyboardButton("🔄 Обновить отклик", callback_data=f"menu:earn:propose:{opp_id}")])
+    rows.append([InlineKeyboardButton("⬅️ Все проекты", callback_data="menu:earn:opps")])
+    rows.append(kb_back_row())
+    await _reply(update, text, InlineKeyboardMarkup(rows))
+
+
+async def _handle_analyze(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, opp_id: str
+) -> None:
+    await _reply(update, "⏳ AI анализирует проект...", None)
+    data = await _post(f"/api/opportunities/{opp_id}/analyze", {})
+    if data and not data.get("result", "").startswith("Ошибка"):
+        result_text = data.get("result", "")
+        d = data.get("data", {})
+        score = d.get("score", 0)
+        text = (
+            f"📊 <b>Анализ завершён</b>\n\n"
+            f"⭐ Скор: <b>{score}/100</b>\n"
+            f"{'✅ Рекомендован' if d.get('recommended') else '⚠️ Не рекомендован'}\n"
+            f"💡 {result_text}\n\n"
+            f"Пакет: <b>{d.get('recommended_package', 'custom')}</b>"
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📝 Написать отклик", callback_data=f"menu:earn:propose:{opp_id}")],
+            [InlineKeyboardButton("⬅️ К проекту", callback_data=f"menu:earn:opp:{opp_id}")],
+            kb_back_row(),
+        ])
+    else:
+        text = f"❌ Ошибка анализа: {data.get('result', '') if data else 'API недоступен'}"
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Назад", callback_data=f"menu:earn:opp:{opp_id}")]])
+    await _reply(update, text, kb)
+
+
+async def _handle_opportunity_propose(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, opp_id: str
+) -> None:
+    await _reply(update, "⏳ AI пишет персональный отклик...", None)
+    data = await _post(f"/api/opportunities/{opp_id}/propose", {})
+    if data and data.get("proposal"):
+        proposal = data["proposal"]
+        price = data.get("data", {}).get("price")
+        text = (
+            f"📝 <b>Отклик готов</b>"
+            + (f" (${price:.0f})" if price else "")
+            + f"\n\n{proposal[:1200]}"
+            + ("\n\n<i>...обрезан до 1200 символов</i>" if len(proposal) > 1200 else "")
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Отправить на подтверждение", callback_data=f"menu:earn:opp:{opp_id}")],
+            [InlineKeyboardButton("⬅️ К проекту", callback_data=f"menu:earn:opp:{opp_id}")],
+            kb_back_row(),
+        ])
+    else:
+        text = f"❌ Ошибка: {data.get('result', '') if data else 'API недоступен'}"
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Назад", callback_data=f"menu:earn:opp:{opp_id}")]])
+    await _reply(update, text, kb)
+
+
+async def show_payments(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    data = await _get("/api/payments")
+    if not data:
+        await _reply(update, "❌ Данные недоступны.", kb_back())
+        return
+
+    payments = data.get("payments", [])
+    gross = data.get("total_gross", 0)
+    net = data.get("total_net", 0)
+
+    if not payments:
+        text = "💵 <b>Оплаты</b>\n\nПлатежей пока нет.\n\nКогда получишь оплату — зафикси через API:\n<code>POST /api/payments</code>"
+    else:
+        lines = [f"💵 <b>Оплаты</b>  Gross: ${gross:.2f} | Net: ${net:.2f}\n"]
+        for p in payments[:10]:
+            status_icon = {"received": "✅", "pending": "⏳", "withdrawn": "💸"}.get(p["status"], "•")
+            lines.append(
+                f"{status_icon} ${p['amount_gross']:.0f}"
+                + (f" → ${p['amount_net']:.0f}" if p.get("amount_net") else "")
+                + f" | {p.get('platform', '?')}"
+            )
+        text = "\n".join(lines)
+
+    await _reply(update, text, kb_back())
 
 
 async def _handle_github_action(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str) -> None:

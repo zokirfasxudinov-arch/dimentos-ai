@@ -24,6 +24,7 @@ from bot.handlers.commands import (
     cmd_start, cmd_status, cmd_tasks, cmd_agents,
     cmd_logs, cmd_projects, cmd_memory, cmd_github,
     cmd_settings, cmd_help, cmd_approve, cmd_reject, cmd_ai, cmd_task,
+    cmd_earn, cmd_leads, cmd_submit,
 )
 from bot.handlers.approvals import handle_approval_callback, send_approval_request
 from bot.handlers.menu import handle_menu_callback
@@ -103,7 +104,10 @@ async def post_init(application: Application) -> None:
     """Runs after the bot starts."""
     commands = [
         ("start",    "Главное меню"),
+        ("earn",     "Заработок — проекты, CRM, доходы"),
+        ("submit",   "Добавить проект по URL для AI-анализа"),
         ("task",     "Поставить задачу агенту"),
+        ("leads",    "Список фриланс-лидов (RSS)"),
         ("ai",       "Чат с AI"),
         ("approve",  "Подтвердить запрос"),
         ("status",   "Состояние системы"),
@@ -166,6 +170,9 @@ def main():
     app.add_handler(CommandHandler("settings", protected(cmd_settings)))
     app.add_handler(CommandHandler("ai",       protected(cmd_ai)))
     app.add_handler(CommandHandler("task",     protected(cmd_task)))
+    app.add_handler(CommandHandler("earn",     protected(cmd_earn)))
+    app.add_handler(CommandHandler("submit",   protected(cmd_submit)))
+    app.add_handler(CommandHandler("leads",    protected(cmd_leads)))
     app.add_handler(CommandHandler("help",     protected(cmd_help)))
 
     app.add_handler(CallbackQueryHandler(handle_approval_callback, pattern=r"^approval:"))

@@ -26,6 +26,9 @@ KNOWN_AGENTS = {
     "github":   {"name": "GitHub Agent",   "description": "Управляет репозиториями и коммитами",        "icon": "🔗"},
     "finance":  {"name": "Finance Agent",  "description": "Отслеживает расходы и бюджет",               "icon": "💰"},
     "security": {"name": "Security Agent", "description": "Сканирует секреты и проверяет безопасность", "icon": "🔐"},
+    "lead":     {"name": "Lead Agent",     "description": "Ищет заказы на фриланс-биржах",             "icon": "💼"},
+    "outreach": {"name": "Outreach Agent",  "description": "Генерирует отклики на заказы через AI",   "icon": "✉️"},
+    "analyst":  {"name": "Analyst Agent",   "description": "Анализирует проект, ставит скор 0-100",   "icon": "📊"},
 }
 
 
@@ -52,6 +55,15 @@ def _get_agent_instance(name: str):
     elif name == "security":
         from agents.security_agent import SecurityAgent
         return SecurityAgent()
+    elif name == "lead":
+        from agents.lead_agent import LeadAgent
+        return LeadAgent()
+    elif name == "outreach":
+        from agents.outreach_agent import OutreachAgent
+        return OutreachAgent()
+    elif name in ("analyst", "opportunity"):
+        from agents.opportunity_analyst import OpportunityAnalyst
+        return OpportunityAnalyst()
     return None
 
 

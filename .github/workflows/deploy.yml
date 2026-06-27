@@ -1,0 +1,23 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 195.158.22.118
+          username: admin1
+          password: ${{ secrets.SSH_PASSWORD }}
+          script: |
+            cd /opt/dimentos-ai
+            git pull origin main
+            sg docker -c "docker compose build --no-cache api bot"
+            sg docker -c "docker compose up -d --no-deps api bot"
+            echo "Deploy complete at $(date)"

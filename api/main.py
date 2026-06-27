@@ -12,8 +12,11 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 
 from core.config import settings
-from core.database import check_db_health
+from core.database import check_db_health, create_tables
+from core.scheduler import scheduler, setup_scheduler
 from api.routers import health, approvals, agents, tasks, projects, memory, github, finance, logs, ai as ai_router
+from api.routers import leads as leads_router
+from api.routers import opportunities as opp_router
 
 
 @asynccontextmanager
@@ -21,7 +24,12 @@ async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown events."""
     logger.info("Dimentos AI Studio OS starting up...")
     logger.info(f"Available AI providers: {settings.available_providers}")
+    await create_tables()
+    setup_scheduler()
+    scheduler.start()
+    logger.info("Scheduler started")
     yield
+    scheduler.shutdown(wait=False)
     logger.info("Dimentos AI Studio OS shutting down...")
 
 
@@ -80,6 +88,8 @@ app.include_router(github.router, prefix="/api", tags=["github"])
 app.include_router(finance.router, prefix="/api", tags=["finance"])
 app.include_router(logs.router, prefix="/api", tags=["logs"])
 app.include_router(ai_router.router, prefix="/api", tags=["ai"])
+app.include_router(leads_router.router, prefix="/api", tags=["leads"])
+app.include_router(opp_router.router, prefix="/api", tags=["crm"])
 
 
 @app.get("/", include_in_schema=False)
