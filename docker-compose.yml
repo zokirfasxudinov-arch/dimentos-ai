@@ -38,7 +38,7 @@ services:
     container_name: dimentos_api
     env_file: .env
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -70,7 +70,7 @@ services:
       dockerfile: Dockerfile
     container_name: dimentos_web
     ports:
-      - "3000:80"
+      - "127.0.0.1:3000:80"
     depends_on:
       - api
     restart: unless-stopped
