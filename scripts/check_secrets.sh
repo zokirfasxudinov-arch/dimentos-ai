@@ -34,8 +34,8 @@ PATTERNS=(
   "ghp_[A-Za-z0-9]{36}"
   "gho_[A-Za-z0-9]{36}"
   "password\s*=\s*['\"][^'\"]{8,}"
-  "BEGIN\s+(RSA|EC|OPENSSH)\s+PRIVATE"
-  "-----BEGIN\s+PRIVATE"
+  "BEGIN (RSA|EC|OPENSSH) PRIVATE"
+  "BEGIN PRIVATE KEY"
 )
 
 BLOCKED_FILES=(
@@ -67,6 +67,8 @@ for file in $STAGED_FILES; do
   if file "$file" | grep -q "binary"; then continue; fi
   # Skip example/template files
   if echo "$file" | grep -qE "(\.example|\.template|\.sample)$"; then continue; fi
+  # Skip the scanner itself (contains patterns as literal strings, not actual secrets)
+  if echo "$file" | grep -qE "check_secrets\.sh$"; then continue; fi
 
   for pattern in "${PATTERNS[@]}"; do
     if git show ":$file" 2>/dev/null | grep -qE "$pattern"; then

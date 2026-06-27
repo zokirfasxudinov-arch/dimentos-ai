@@ -13,7 +13,7 @@ from loguru import logger
 
 from core.config import settings
 from core.database import check_db_health
-from api.routers import health, approvals, agents, tasks, projects, memory, github, finance, logs
+from api.routers import health, approvals, agents, tasks, projects, memory, github, finance, logs, ai as ai_router
 
 
 @asynccontextmanager
@@ -79,6 +79,7 @@ app.include_router(memory.router, prefix="/api", tags=["memory"])
 app.include_router(github.router, prefix="/api", tags=["github"])
 app.include_router(finance.router, prefix="/api", tags=["finance"])
 app.include_router(logs.router, prefix="/api", tags=["logs"])
+app.include_router(ai_router.router, prefix="/api", tags=["ai"])
 
 
 @app.get("/", include_in_schema=False)

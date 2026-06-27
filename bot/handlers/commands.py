@@ -29,38 +29,25 @@ async def _api_get(path: str) -> Optional[dict]:
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /start command."""
-    await update.message.reply_text(
-        "*Dimentos AI Studio OS*\n\n"
-        "Система управления AI-агентами запущена.\n\n"
-        "Используй /help для просмотра команд.\n"
-        "Используй /status для проверки состояния системы.",
-        parse_mode="Markdown",
-    )
+    """Handle /start — show main menu."""
+    from bot.handlers.menu import show_main_menu
+    await show_main_menu(update, context)
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /help command."""
-    help_text = (
-        "*Dimentos AI Studio OS - Команды*\n\n"
-        "/status - Состояние системы\n"
-        "/tasks - Список задач\n"
-        "/agents - Статус агентов\n"
-        "/approve - Подтвердить ожидающий запрос\n"
-        "/reject - Отклонить ожидающий запрос\n"
-        "/logs - Последние логи агентов\n"
-        "/projects - Список проектов\n"
-        "/memory - Просмотр vault памяти\n"
-        "/github - Статус GitHub\n"
-        "/settings - Настройки бота\n"
-        "/help - Эта справка\n\n"
-        "_Все действия агентов с риском MEDIUM/HIGH требуют подтверждения._"
-    )
-    await update.message.reply_text(help_text, parse_mode="Markdown")
+    """Handle /help — show help section."""
+    from bot.handlers.menu import show_help
+    await show_help(update, context)
 
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /status - show system health."""
+    """Handle /status."""
+    from bot.handlers.menu import show_status
+    await show_status(update, context)
+
+
+async def _cmd_status_old(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Legacy /status - kept for reference."""
     data = await _api_get("/health")
     if not data:
         await update.message.reply_text("API недоступен. Проверь контейнеры.")
@@ -88,7 +75,13 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /tasks - list recent tasks."""
+    """Handle /tasks."""
+    from bot.handlers.menu import show_tasks
+    await show_tasks(update, context)
+
+
+async def _cmd_tasks_old(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Legacy /tasks."""
     data = await _api_get("/api/tasks?limit=10")
     if not data:
         await update.message.reply_text("Не удалось получить задачи.")
@@ -112,7 +105,13 @@ async def cmd_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_agents(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /agents - show agent statuses."""
+    """Handle /agents."""
+    from bot.handlers.menu import show_agents
+    await show_agents(update, context)
+
+
+async def _cmd_agents_old(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Legacy /agents."""
     data = await _api_get("/api/agents/status")
     if not data:
         await update.message.reply_text("Не удалось получить статусы агентов.")
@@ -198,7 +197,13 @@ async def cmd_reject(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def cmd_logs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /logs - show recent agent logs."""
+    """Handle /logs."""
+    from bot.handlers.menu import show_logs_menu
+    await show_logs_menu(update, context)
+
+
+async def _cmd_logs_old(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Legacy /logs."""
     data = await _api_get("/api/logs/agent?limit=10")
     if not data:
         await update.message.reply_text("Не удалось получить логи.")
@@ -218,7 +223,13 @@ async def cmd_logs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_projects(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /projects - list all projects."""
+    """Handle /projects."""
+    from bot.handlers.menu import show_projects
+    await show_projects(update, context)
+
+
+async def _cmd_projects_old(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Legacy /projects."""
     data = await _api_get("/api/projects")
     if not data:
         await update.message.reply_text("Не удалось получить проекты.")
@@ -237,7 +248,13 @@ async def cmd_projects(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def cmd_memory(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /memory - show vault stats."""
+    """Handle /memory."""
+    from bot.handlers.menu import show_memory
+    await show_memory(update, context)
+
+
+async def _cmd_memory_old(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Legacy /memory."""
     data = await _api_get("/api/memory/notes")
     if not data:
         await update.message.reply_text("Vault недоступен.")
@@ -260,7 +277,13 @@ async def cmd_memory(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def cmd_github(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /github - GitHub status."""
+    """Handle /github."""
+    from bot.handlers.menu import show_github
+    await show_github(update, context)
+
+
+async def _cmd_github_old(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Legacy /github."""
     data = await _api_get("/api/github/status")
     if not data:
         await update.message.reply_text("GitHub API недоступен.")
@@ -279,14 +302,230 @@ async def cmd_github(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 
 async def cmd_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /settings - show current non-sensitive settings."""
+    """Handle /settings."""
+    from bot.handlers.menu import show_settings
+    await show_settings(update, context)
+
+
+async def _cmd_settings_old(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Legacy /settings."""
+    providers = settings.available_providers
     msg = (
         f"*Настройки Dimentos AI Studio OS*\n\n"
         f"Домен: `{settings.domain}`\n"
         f"API порт: `{settings.api_port}`\n"
         f"Log level: `{settings.log_level}`\n"
-        f"AI провайдеры: `{', '.join(settings.available_providers) or 'не настроены'}`\n"
+        f"AI провайдеры ({len(providers)}): `{', '.join(providers) or 'не настроены'}`\n"
         f"GitHub user: `{settings.github_user or 'не настроен'}`\n\n"
         f"_Токены и пароли не отображаются из соображений безопасности._"
     )
     await update.message.reply_text(msg, parse_mode="Markdown")
+
+
+async def cmd_ai(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /ai <prompt> — quick AI chat directly from Telegram."""
+    if not context.args:
+        providers = settings.available_providers
+        data = await _api_get("/api/ai/status")
+        provider_lines = ""
+        if data:
+            for p in data.get("providers", []):
+                m = data.get("default_models", {}).get(p, "")
+                provider_lines += f"\n  • {p}: `{m}`"
+        await update.message.reply_text(
+            f"*AI Провайдеры*\n\n"
+            f"Активных: {len(providers)}{provider_lines}\n\n"
+            f"Использование: `/ai <вопрос>`\n"
+            f"Принудительно: `/ai [anthropic|gemini|openrouter|groq] <вопрос>`",
+            parse_mode="Markdown",
+        )
+        return
+
+    args = context.args
+    # Check if first arg is provider name
+    known_providers = ["anthropic", "gemini", "openrouter", "groq", "openai"]
+    provider = None
+    if args[0].lower() in known_providers:
+        provider = args[0].lower()
+        prompt = " ".join(args[1:])
+    else:
+        prompt = " ".join(args)
+
+    if not prompt:
+        await update.message.reply_text("Укажи вопрос после команды.")
+        return
+
+    thinking_msg = await update.message.reply_text("Думаю...")
+
+    try:
+        body: dict = {"prompt": prompt, "max_tokens": 1500}
+        if provider:
+            body["provider"] = provider
+
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{API_BASE}/api/ai/chat",
+                json=body,
+                timeout=60,
+            )
+            r.raise_for_status()
+            data = r.json()
+
+        text = data["text"]
+        prov_info = f"_{data['provider']} / {data['model']}_"
+
+        # Telegram message limit is 4096 chars
+        reply = f"{text[:3800]}\n\n{prov_info}" if len(text) > 3800 else f"{text}\n\n{prov_info}"
+        await thinking_msg.edit_text(reply, parse_mode="Markdown")
+
+    except Exception as e:
+        await thinking_msg.edit_text(f"Ошибка AI: {e}")
+
+
+# ──────────────────────────────────────────────────────────────────
+# /task — главная команда для постановки задач агентам
+# ──────────────────────────────────────────────────────────────────
+
+AGENT_KEYWORDS = {
+    "research":  ["найди", "исследуй", "поищи", "проанализируй", "изучи", "проверь рынок", "кто", "что такое", "как работает"],
+    "proposal":  ["напиши", "составь", "создай", "предложение", "ТЗ", "техническое задание", "договор", "коммерческое"],
+    "security":  ["безопасность", "уязвимость", "секрет", "скан", "audit"],
+    "memory":    ["запомни", "сохрани", "запиши в память", "добавь в vault"],
+    "github":    ["github", "репозиторий", "коммит", "пуш", "репо"],
+    "finance":   ["расходы", "бюджет", "стоимость", "сколько потратили"],
+    "ceo":       ["спланируй", "разбей", "план", "стратегия", "делегируй"],
+}
+
+
+def _pick_agent_for_task(task: str) -> str:
+    task_lower = task.lower()
+    for agent, keywords in AGENT_KEYWORDS.items():
+        if any(kw in task_lower for kw in keywords):
+            return agent
+    return "research"  # default
+
+
+async def cmd_task(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    /task <описание> — поставить задачу агенту.
+
+    Агент выбирается автоматически по ключевым словам.
+    Принудительно: /task research найди клиентов
+    """
+    if not context.args:
+        await update.message.reply_text(
+            "📋 *Постановка задачи агентам*\n\n"
+            "Использование: `/task <задача>`\n\n"
+            "Примеры:\n"
+            "• `/task найди 5 потенциальных клиентов для AI-студии`\n"
+            "• `/task напиши коммерческое предложение для веб-агентства`\n"
+            "• `/task проанализируй рынок AI-автоматизации в Узбекистане`\n"
+            "• `/task составь ТЗ для Telegram-бота с оплатой`\n\n"
+            "Агент выбирается автоматически. "
+            "Чтобы указать явно: `/task research <задача>`",
+            parse_mode="Markdown",
+        )
+        return
+
+    args = list(context.args)
+    # Check if first word is explicit agent name
+    explicit_agents = list(AGENT_KEYWORDS.keys())
+    if args[0].lower() in explicit_agents:
+        agent_name = args[0].lower()
+        task_text = " ".join(args[1:])
+    else:
+        task_text = " ".join(args)
+        agent_name = _pick_agent_for_task(task_text)
+
+    if not task_text:
+        await update.message.reply_text("Укажи задачу после команды.")
+        return
+
+    AGENT_ICONS = {
+        "research": "🔍", "proposal": "📝", "ceo": "🧠",
+        "memory": "🧩", "github": "🔗", "finance": "💰", "security": "🔐",
+    }
+    icon = AGENT_ICONS.get(agent_name, "🤖")
+
+    thinking = await update.message.reply_text(
+        f"{icon} *{agent_name.upper()} агент* выполняет задачу...\n\n"
+        f"_{task_text[:100]}_",
+        parse_mode="Markdown",
+    )
+
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.post(
+                f"{API_BASE}/api/agents/{agent_name}/run",
+                json={"task": task_text, "params": {}, "async_run": False},
+                timeout=65,
+            )
+            r.raise_for_status()
+            data = r.json()
+
+        if data.get("success"):
+            result_data = data.get("data", {})
+            # Format the result nicely
+            if isinstance(result_data, dict):
+                if "result" in result_data:
+                    # Research/AI result
+                    text = result_data["result"]
+                    provider = result_data.get("provider", "")
+                    reply = (
+                        f"{icon} *Результат ({agent_name})*\n\n"
+                        f"{text[:3500]}"
+                        f"\n\n_{provider}/{result_data.get('model', '')}_" if provider else ""
+                    )
+                elif "content" in result_data:
+                    # Proposal result
+                    content = result_data["content"]
+                    path = result_data.get("path", "")
+                    reply = (
+                        f"📝 *Документ создан*\n\n"
+                        f"{content[:3000]}\n\n"
+                        f"_Сохранено: {path}_"
+                    )
+                elif "plan" in result_data or "steps" in result_data:
+                    # CEO plan
+                    import json
+                    reply = (
+                        f"🧠 *План выполнения*\n\n"
+                        f"```\n{json.dumps(result_data, ensure_ascii=False, indent=2)[:2000]}\n```"
+                    )
+                else:
+                    import json
+                    reply = (
+                        f"{icon} *Готово!*\n\n"
+                        f"```\n{json.dumps(result_data, ensure_ascii=False, indent=2)[:2500]}\n```"
+                    )
+            else:
+                reply = f"{icon} *Готово!*\n\n{str(result_data)[:3000]}"
+
+            # Trim to Telegram limit
+            if len(reply) > 4000:
+                reply = reply[:3900] + "\n\n_...результат обрезан_"
+
+            keyboard = InlineKeyboardMarkup([[
+                InlineKeyboardButton("🏠 Меню", callback_data="menu:main"),
+                InlineKeyboardButton("📋 Задачи", callback_data="menu:tasks"),
+            ]])
+            await thinking.edit_text(reply, parse_mode="Markdown", reply_markup=keyboard)
+
+        else:
+            err = data.get("error") or "Неизвестная ошибка"
+            await thinking.edit_text(
+                f"❌ *Ошибка агента {agent_name}*\n\n{err[:500]}",
+                parse_mode="Markdown",
+            )
+
+    except asyncio.TimeoutError:
+        await thinking.edit_text(
+            f"⏱ *Таймаут*\n\nЗадача выполняется дольше 60 секунд. "
+            f"Проверь статус в /tasks",
+            parse_mode="Markdown",
+        )
+    except Exception as e:
+        await thinking.edit_text(f"❌ Ошибка: {e}")
+
+
+import asyncio

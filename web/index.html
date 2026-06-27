@@ -10,319 +10,1027 @@
       theme: {
         extend: {
           colors: {
-            cyber: { bg: '#0a0e1a', card: '#0f1629', border: '#1e2d4a', accent: '#00d4ff', text: '#c8d6f0', dim: '#6b7fa3' }
+            cyber: {
+              bg: '#0a0e1a',
+              card: '#0f1629',
+              border: '#1e2d4a',
+              accent: '#00d4ff',
+              text: '#c8d6f0',
+              dim: '#6b7fa3'
+            }
           }
         }
       }
     }
   </script>
   <style>
-    body { background: #0a0e1a; color: #c8d6f0; font-family: 'Courier New', monospace; }
+    * { box-sizing: border-box; }
+    body { background: #0a0e1a; color: #c8d6f0; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; }
     .card { background: #0f1629; border: 1px solid #1e2d4a; border-radius: 0.75rem; }
-    .badge-low { background: rgba(0,200,100,0.15); color: #00c864; border: 1px solid rgba(0,200,100,0.3); }
-    .badge-medium { background: rgba(255,200,0,0.15); color: #ffc800; border: 1px solid rgba(255,200,0,0.3); }
-    .badge-high { background: rgba(255,60,60,0.15); color: #ff3c3c; border: 1px solid rgba(255,60,60,0.3); }
-    .badge-pending { background: rgba(0,212,255,0.15); color: #00d4ff; border: 1px solid rgba(0,212,255,0.3); }
-    .badge-approved { background: rgba(0,200,100,0.15); color: #00c864; border: 1px solid rgba(0,200,100,0.3); }
-    .badge-rejected { background: rgba(255,60,60,0.15); color: #ff3c3c; border: 1px solid rgba(255,60,60,0.3); }
-    .nav-btn { padding: 0.5rem 1rem; border-radius: 0.5rem; transition: all 0.2s; cursor: pointer; border: 1px solid transparent; }
-    .nav-btn:hover, .nav-btn.active { background: rgba(0,212,255,0.1); color: #00d4ff; border-color: rgba(0,212,255,0.3); }
-    .spin { animation: spin 1s linear infinite; }
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .card-hover { transition: border-color 0.2s, box-shadow 0.2s; }
+    .card-hover:hover { border-color: rgba(0,212,255,0.3); box-shadow: 0 0 16px rgba(0,212,255,0.07); }
+
+    /* Badges */
+    .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-family: 'Courier New', monospace; font-weight: 600; }
+    .badge-low    { background: rgba(0,200,100,0.13); color: #00c864; border: 1px solid rgba(0,200,100,0.3); }
+    .badge-medium { background: rgba(255,200,0,0.13); color: #ffc800; border: 1px solid rgba(255,200,0,0.3); }
+    .badge-high   { background: rgba(255,60,60,0.13);  color: #ff5555; border: 1px solid rgba(255,60,60,0.3); }
+    .badge-ok     { background: rgba(0,200,100,0.13); color: #00c864; border: 1px solid rgba(0,200,100,0.3); }
+    .badge-error  { background: rgba(255,60,60,0.13);  color: #ff5555; border: 1px solid rgba(255,60,60,0.3); }
+
+    /* Task/approval status */
+    .badge-pending     { background: rgba(107,127,163,0.2); color: #a0b0cc; border: 1px solid rgba(107,127,163,0.3); }
+    .badge-in_progress { background: rgba(0,212,255,0.13); color: #00d4ff; border: 1px solid rgba(0,212,255,0.3); }
+    .badge-done        { background: rgba(0,200,100,0.13); color: #00c864; border: 1px solid rgba(0,200,100,0.3); }
+    .badge-failed      { background: rgba(255,60,60,0.13);  color: #ff5555; border: 1px solid rgba(255,60,60,0.3); }
+    .badge-approved    { background: rgba(0,200,100,0.13); color: #00c864; border: 1px solid rgba(0,200,100,0.3); }
+    .badge-rejected    { background: rgba(255,60,60,0.13);  color: #ff5555; border: 1px solid rgba(255,60,60,0.3); }
+    .badge-active      { background: rgba(0,200,100,0.13); color: #00c864; border: 1px solid rgba(0,200,100,0.3); }
+    .badge-idle        { background: rgba(255,200,0,0.13); color: #ffc800; border: 1px solid rgba(255,200,0,0.3); }
+
+    /* Nav */
+    .nav-btn { display: block; width: 100%; text-align: left; padding: 0.5rem 0.75rem; border-radius: 0.5rem;
+               border: 1px solid transparent; cursor: pointer; font-size: 0.875rem; color: #6b7fa3;
+               background: transparent; transition: all 0.2s; }
+    .nav-btn:hover { background: rgba(0,212,255,0.07); color: #c8d6f0; border-color: rgba(0,212,255,0.15); }
+    .nav-btn.active { background: rgba(0,212,255,0.12); color: #00d4ff; border-color: rgba(0,212,255,0.35); }
+
+    /* Spinner */
+    .spin { display: inline-block; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0a0e1a; }
+    ::-webkit-scrollbar-thumb { background: #1e2d4a; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #2a3d5a; }
+
+    /* Chat bubbles */
+    .bubble-user { background: rgba(0,212,255,0.12); border: 1px solid rgba(0,212,255,0.25); border-radius: 12px 12px 2px 12px; }
+    .bubble-ai   { background: #0f1629; border: 1px solid #1e2d4a; border-radius: 12px 12px 12px 2px; }
+
+    /* Log area */
+    .log-area { font-family: 'Courier New', monospace; font-size: 12px; }
+
+    /* Glow accent */
+    .accent-glow { text-shadow: 0 0 10px rgba(0,212,255,0.5); }
+
+    /* Button base */
+    .btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 14px; border-radius: 6px;
+           font-size: 13px; cursor: pointer; border: 1px solid; transition: all 0.18s; }
+    .btn-cyan  { background: rgba(0,212,255,0.1); color: #00d4ff; border-color: rgba(0,212,255,0.35); }
+    .btn-cyan:hover  { background: rgba(0,212,255,0.2); }
+    .btn-green { background: rgba(0,200,100,0.1); color: #00c864; border-color: rgba(0,200,100,0.35); }
+    .btn-green:hover { background: rgba(0,200,100,0.2); }
+    .btn-red   { background: rgba(255,60,60,0.1);  color: #ff5555; border-color: rgba(255,60,60,0.35); }
+    .btn-red:hover   { background: rgba(255,60,60,0.2); }
+    .btn-gray  { background: rgba(107,127,163,0.1); color: #a0b0cc; border-color: rgba(107,127,163,0.25); }
+    .btn-gray:hover  { background: rgba(107,127,163,0.2); }
+
+    /* Input */
+    .inp { background: #0a0e1a; border: 1px solid #1e2d4a; color: #c8d6f0; border-radius: 6px; padding: 8px 12px; font-size: 13px; outline: none; width: 100%; }
+    .inp:focus { border-color: rgba(0,212,255,0.5); box-shadow: 0 0 0 2px rgba(0,212,255,0.08); }
+    .inp::placeholder { color: #4a5a76; }
+    select.inp option { background: #0f1629; }
+
+    /* Table */
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th { text-align: left; padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7fa3; border-bottom: 1px solid #1e2d4a; }
+    .data-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid rgba(30,45,74,0.5); vertical-align: middle; }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* Modal */
+    .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 50; display: flex; align-items: center; justify-content: center; }
+    .modal-box { background: #0f1629; border: 1px solid #1e2d4a; border-radius: 12px; padding: 24px; width: 480px; max-width: 95vw; }
+
+    /* Stat card */
+    .stat-card { background: #0f1629; border: 1px solid #1e2d4a; border-radius: 10px; padding: 16px 20px; position: relative; overflow: hidden; }
+    .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+    .stat-card.cyan::before   { background: linear-gradient(90deg, transparent, #00d4ff, transparent); }
+    .stat-card.green::before  { background: linear-gradient(90deg, transparent, #00c864, transparent); }
+    .stat-card.yellow::before { background: linear-gradient(90deg, transparent, #ffc800, transparent); }
+    .stat-card.red::before    { background: linear-gradient(90deg, transparent, #ff5555, transparent); }
+    .stat-card.purple::before { background: linear-gradient(90deg, transparent, #a855f7, transparent); }
+
+    /* Dot indicators */
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .dot-green  { background: #00c864; box-shadow: 0 0 6px #00c864; }
+    .dot-yellow { background: #ffc800; box-shadow: 0 0 6px #ffc800; }
+    .dot-red    { background: #ff5555; box-shadow: 0 0 6px #ff5555; }
+    .dot-gray   { background: #4a5a76; }
+    .dot-cyan   { background: #00d4ff; box-shadow: 0 0 6px #00d4ff; }
+
+    /* Sidebar mobile */
+    @media (max-width: 640px) {
+      .sidebar { width: 100%; min-height: auto; flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid #1e2d4a; padding: 8px; }
+      .sidebar .nav-btn { width: auto; flex: 1; text-align: center; font-size: 12px; padding: 6px 8px; }
+      .layout { flex-direction: column; }
+    }
+
+    /* Pending badge */
+    .pending-badge { background: #ff5555; color: white; border-radius: 50%; font-size: 10px; font-weight: 700; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; margin-left: 4px; }
+
+    /* Section hidden */
+    .section { display: none; }
+    .section.active { display: block; }
   </style>
 </head>
 <body class="min-h-screen">
 
-  <!-- Header -->
-  <header class="border-b border-cyber-border px-6 py-4 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <div class="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 font-bold">D</div>
-      <div>
-        <h1 class="text-sm font-bold text-white">Dimentos AI Studio OS</h1>
-        <p class="text-xs text-cyber-dim">dimentosai.uz</p>
-      </div>
+<!-- Modal for agent run -->
+<div id="modal-run" class="modal-bg" style="display:none;">
+  <div class="modal-box">
+    <h3 class="text-white font-semibold mb-1" id="modal-agent-name">Запустить агента</h3>
+    <p class="text-xs text-cyber-dim mb-4">Введите задачу для агента</p>
+    <textarea id="modal-task-input" class="inp mb-3" rows="4" placeholder="Опишите задачу..."></textarea>
+    <div class="flex gap-2 justify-end">
+      <button class="btn btn-gray" onclick="closeModal()">Отмена</button>
+      <button class="btn btn-cyan" onclick="submitAgentRun()">&#9654; Запустить</button>
     </div>
-    <div class="flex items-center gap-2">
-      <span id="health-dot" class="w-2 h-2 rounded-full bg-gray-500"></span>
-      <span id="health-text" class="text-xs text-cyber-dim">Connecting...</span>
-    </div>
-  </header>
-
-  <div class="flex">
-    <!-- Sidebar -->
-    <nav class="w-48 min-h-screen border-r border-cyber-border p-3 space-y-1 text-sm">
-      <button class="nav-btn active w-full text-left" onclick="showSection('dashboard')">Dashboard</button>
-      <button class="nav-btn w-full text-left" onclick="showSection('agents')">Agents</button>
-      <button class="nav-btn w-full text-left" onclick="showSection('approvals')">Approvals</button>
-      <button class="nav-btn w-full text-left" onclick="showSection('tasks')">Tasks</button>
-      <button class="nav-btn w-full text-left" onclick="showSection('projects')">Projects</button>
-      <button class="nav-btn w-full text-left" onclick="showSection('logs')">Logs</button>
-    </nav>
-
-    <!-- Main content -->
-    <main class="flex-1 p-6 space-y-4">
-
-      <!-- Dashboard -->
-      <div id="section-dashboard">
-        <h2 class="text-lg font-bold text-white mb-4">Dashboard</h2>
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          <div class="card p-4">
-            <p class="text-xs text-cyber-dim mb-1">Approvals Pending</p>
-            <p class="text-2xl font-bold text-cyan-400" id="stat-pending">—</p>
-          </div>
-          <div class="card p-4">
-            <p class="text-xs text-cyber-dim mb-1">Active Agents</p>
-            <p class="text-2xl font-bold text-green-400" id="stat-agents">—</p>
-          </div>
-          <div class="card p-4">
-            <p class="text-xs text-cyber-dim mb-1">Open Tasks</p>
-            <p class="text-2xl font-bold text-yellow-400" id="stat-tasks">—</p>
-          </div>
-          <div class="card p-4">
-            <p class="text-xs text-cyber-dim mb-1">Projects</p>
-            <p class="text-2xl font-bold text-purple-400" id="stat-projects">—</p>
-          </div>
-        </div>
-
-        <div class="card p-4">
-          <p class="text-xs text-cyber-dim uppercase tracking-widest mb-3">System Services</p>
-          <div id="services-list" class="space-y-2">
-            <p class="text-xs text-cyber-dim">Loading...</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Agents -->
-      <div id="section-agents" class="hidden">
-        <h2 class="text-lg font-bold text-white mb-4">Agents</h2>
-        <div id="agents-list" class="space-y-2">
-          <p class="text-xs text-cyber-dim">Loading...</p>
-        </div>
-      </div>
-
-      <!-- Approvals -->
-      <div id="section-approvals" class="hidden">
-        <h2 class="text-lg font-bold text-white mb-4">Approval Requests</h2>
-        <div id="approvals-list" class="space-y-3">
-          <p class="text-xs text-cyber-dim">Loading...</p>
-        </div>
-      </div>
-
-      <!-- Tasks -->
-      <div id="section-tasks" class="hidden">
-        <h2 class="text-lg font-bold text-white mb-4">Tasks</h2>
-        <div id="tasks-list" class="space-y-2">
-          <p class="text-xs text-cyber-dim">Loading...</p>
-        </div>
-      </div>
-
-      <!-- Projects -->
-      <div id="section-projects" class="hidden">
-        <h2 class="text-lg font-bold text-white mb-4">Projects</h2>
-        <div id="projects-list" class="space-y-2">
-          <p class="text-xs text-cyber-dim">Loading...</p>
-        </div>
-      </div>
-
-      <!-- Logs -->
-      <div id="section-logs" class="hidden">
-        <h2 class="text-lg font-bold text-white mb-4">Agent Logs</h2>
-        <div id="logs-list" class="space-y-2 font-mono text-xs">
-          <p class="text-cyber-dim">Loading...</p>
-        </div>
-      </div>
-
-    </main>
+    <div id="modal-result" class="mt-3 text-xs font-mono hidden"></div>
   </div>
+</div>
+
+<!-- Header -->
+<header style="border-bottom: 1px solid #1e2d4a;" class="px-5 py-3 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <div style="width:32px;height:32px;background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.35);border-radius:8px;display:flex;align-items:center;justify-content:center;">
+      <span style="color:#00d4ff;font-weight:800;font-size:15px;">D</span>
+    </div>
+    <div>
+      <div style="color:#fff;font-size:14px;font-weight:700;letter-spacing:0.02em;">Dimentos AI Studio OS</div>
+      <div style="color:#6b7fa3;font-size:11px;">dimentosai.uz</div>
+    </div>
+  </div>
+  <div class="flex items-center gap-3">
+    <span id="header-time" style="color:#4a5a76;font-size:11px;font-family:'Courier New',monospace;"></span>
+    <div class="flex items-center gap-1.5">
+      <span id="health-dot" class="dot dot-gray"></span>
+      <span id="health-text" style="color:#6b7fa3;font-size:12px;">Подключение...</span>
+    </div>
+  </div>
+</header>
+
+<div class="layout flex" style="min-height:calc(100vh - 57px);">
+  <!-- Sidebar -->
+  <nav class="sidebar" style="width:180px;min-height:100%;border-right:1px solid #1e2d4a;padding:12px 8px;flex-shrink:0;display:flex;flex-direction:column;gap:2px;">
+    <button class="nav-btn active" data-section="dashboard" onclick="showSection('dashboard',this)">
+      &#9632; Дашборд
+    </button>
+    <button class="nav-btn" data-section="chat" onclick="showSection('chat',this)">
+      &#9997; AI Чат
+    </button>
+    <button class="nav-btn" data-section="approvals" onclick="showSection('approvals',this)">
+      &#10004; Согласования <span id="nav-pending-badge"></span>
+    </button>
+    <button class="nav-btn" data-section="agents" onclick="showSection('agents',this)">
+      &#9874; Агенты
+    </button>
+    <button class="nav-btn" data-section="tasks" onclick="showSection('tasks',this)">
+      &#128203; Задачи
+    </button>
+    <button class="nav-btn" data-section="projects" onclick="showSection('projects',this)">
+      &#128193; Проекты
+    </button>
+    <button class="nav-btn" data-section="logs" onclick="showSection('logs',this)">
+      &#128196; Логи
+    </button>
+  </nav>
+
+  <!-- Main -->
+  <main style="flex:1;padding:20px 24px;overflow-y:auto;min-width:0;">
+
+    <!-- ===== DASHBOARD ===== -->
+    <div id="section-dashboard" class="section active">
+      <div class="flex items-center justify-between mb-5">
+        <h2 style="color:#fff;font-size:18px;font-weight:700;">Дашборд</h2>
+        <button class="btn btn-gray" onclick="loadDashboard()" style="font-size:12px;">&#8635; Обновить</button>
+      </div>
+
+      <!-- Stat cards -->
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;" id="stat-cards">
+        <div class="stat-card cyan" style="flex:1;min-width:140px;">
+          <div style="font-size:11px;color:#6b7fa3;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">База данных</div>
+          <div style="font-size:22px;font-weight:700;color:#00d4ff;" id="stat-db">—</div>
+        </div>
+        <div class="stat-card green" style="flex:1;min-width:140px;">
+          <div style="font-size:11px;color:#6b7fa3;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Redis</div>
+          <div style="font-size:22px;font-weight:700;color:#00c864;" id="stat-redis">—</div>
+        </div>
+        <div class="stat-card red" style="flex:1;min-width:140px;">
+          <div style="font-size:11px;color:#6b7fa3;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Согласования</div>
+          <div style="font-size:22px;font-weight:700;" id="stat-pending">—</div>
+        </div>
+        <div class="stat-card yellow" style="flex:1;min-width:140px;">
+          <div style="font-size:11px;color:#6b7fa3;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Задачи</div>
+          <div style="font-size:22px;font-weight:700;color:#ffc800;" id="stat-tasks">—</div>
+        </div>
+        <div class="stat-card purple" style="flex:1;min-width:140px;">
+          <div style="font-size:11px;color:#6b7fa3;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">AI провайдеры</div>
+          <div style="font-size:22px;font-weight:700;color:#a855f7;" id="stat-ai">—</div>
+        </div>
+        <div class="stat-card cyan" style="flex:1;min-width:140px;">
+          <div style="font-size:11px;color:#6b7fa3;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Расходы AI (USD)</div>
+          <div style="font-size:22px;font-weight:700;color:#00d4ff;" id="stat-cost">—</div>
+        </div>
+      </div>
+
+      <!-- System services -->
+      <div class="card" style="padding:16px;margin-bottom:16px;">
+        <div style="font-size:11px;color:#6b7fa3;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">Системные сервисы</div>
+        <div id="dash-services" style="display:flex;flex-wrap:wrap;gap:10px;">
+          <span style="color:#6b7fa3;font-size:12px;">Загрузка...</span>
+        </div>
+      </div>
+
+      <!-- Last logs -->
+      <div class="card" style="padding:16px;">
+        <div style="font-size:11px;color:#6b7fa3;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">Последние события</div>
+        <div id="dash-logs" class="log-area" style="max-height:220px;overflow-y:auto;">
+          <span style="color:#6b7fa3;font-size:12px;">Загрузка...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== AI CHAT ===== -->
+    <div id="section-chat" class="section">
+      <div class="flex items-center justify-between mb-5">
+        <h2 style="color:#fff;font-size:18px;font-weight:700;">AI Чат</h2>
+        <button class="btn btn-gray" onclick="clearChat()" style="font-size:12px;">&#128465; Очистить</button>
+      </div>
+
+      <!-- Provider + Model row -->
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;align-items:flex-end;">
+        <div style="flex:1;min-width:160px;">
+          <div style="font-size:11px;color:#6b7fa3;margin-bottom:5px;">Провайдер</div>
+          <select id="chat-provider" class="inp"></select>
+        </div>
+        <div style="flex:1;min-width:160px;">
+          <div style="font-size:11px;color:#6b7fa3;margin-bottom:5px;">Модель <span style="color:#4a5a76;">(необязательно)</span></div>
+          <input id="chat-model" type="text" class="inp" placeholder="по умолчанию">
+        </div>
+        <div style="flex:2;min-width:200px;">
+          <div style="font-size:11px;color:#6b7fa3;margin-bottom:5px;">Системный промпт <span style="color:#4a5a76;">(необязательно)</span></div>
+          <input id="chat-system" type="text" class="inp" placeholder="Ты полезный AI-ассистент...">
+        </div>
+      </div>
+
+      <!-- Chat window -->
+      <div class="card" id="chat-window" style="min-height:360px;max-height:460px;overflow-y:auto;padding:16px;margin-bottom:12px;display:flex;flex-direction:column;gap:12px;">
+        <div id="chat-messages" style="display:flex;flex-direction:column;gap:12px;flex:1;">
+          <div style="text-align:center;color:#4a5a76;font-size:12px;padding:40px 0;">Начните диалог с AI &#8595;</div>
+        </div>
+      </div>
+
+      <!-- Input row -->
+      <div style="display:flex;gap:10px;align-items:flex-end;">
+        <textarea id="chat-input" class="inp" rows="2" placeholder="Введите сообщение... (Enter — отправить, Shift+Enter — новая строка)" style="flex:1;resize:none;font-family:inherit;"></textarea>
+        <button class="btn btn-cyan" id="chat-send-btn" onclick="sendChat()" style="height:56px;width:80px;justify-content:center;font-size:16px;">&#9658;</button>
+      </div>
+    </div>
+
+    <!-- ===== APPROVALS ===== -->
+    <div id="section-approvals" class="section">
+      <div class="flex items-center justify-between mb-5">
+        <h2 style="color:#fff;font-size:18px;font-weight:700;">Согласования</h2>
+        <div class="flex gap-2 items-center">
+          <span style="font-size:11px;color:#6b7fa3;" id="approvals-last-refresh"></span>
+          <button class="btn btn-gray" onclick="loadApprovals()" style="font-size:12px;">&#8635; Обновить</button>
+        </div>
+      </div>
+      <div id="approvals-list">
+        <div style="color:#6b7fa3;font-size:13px;padding:20px 0;">Загрузка...</div>
+      </div>
+    </div>
+
+    <!-- ===== AGENTS ===== -->
+    <div id="section-agents" class="section">
+      <div class="flex items-center justify-between mb-5">
+        <h2 style="color:#fff;font-size:18px;font-weight:700;">Агенты</h2>
+        <button class="btn btn-gray" onclick="loadAgents()" style="font-size:12px;">&#8635; Обновить</button>
+      </div>
+      <div class="card" style="overflow:hidden;">
+        <table class="data-table" id="agents-table">
+          <thead>
+            <tr>
+              <th>Агент</th>
+              <th>Статус</th>
+              <th>Описание</th>
+              <th>Действие</th>
+            </tr>
+          </thead>
+          <tbody id="agents-tbody">
+            <tr><td colspan="4" style="color:#6b7fa3;text-align:center;padding:24px;">Загрузка...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== TASKS ===== -->
+    <div id="section-tasks" class="section">
+      <div class="flex items-center justify-between mb-5">
+        <h2 style="color:#fff;font-size:18px;font-weight:700;">Задачи</h2>
+        <button class="btn btn-gray" onclick="loadTasks()" style="font-size:12px;">&#8635; Обновить</button>
+      </div>
+      <div class="card" style="overflow:hidden;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Название</th>
+              <th>Агент</th>
+              <th>Статус</th>
+              <th>Приоритет</th>
+            </tr>
+          </thead>
+          <tbody id="tasks-tbody">
+            <tr><td colspan="4" style="color:#6b7fa3;text-align:center;padding:24px;">Загрузка...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== PROJECTS ===== -->
+    <div id="section-projects" class="section">
+      <div class="flex items-center justify-between mb-5">
+        <h2 style="color:#fff;font-size:18px;font-weight:700;">Проекты</h2>
+        <button class="btn btn-gray" onclick="loadProjects()" style="font-size:12px;">&#8635; Обновить</button>
+      </div>
+      <div id="projects-grid" style="display:flex;flex-wrap:wrap;gap:14px;">
+        <div style="color:#6b7fa3;font-size:13px;padding:20px 0;">Загрузка...</div>
+      </div>
+    </div>
+
+    <!-- ===== LOGS ===== -->
+    <div id="section-logs" class="section">
+      <div class="flex items-center justify-between mb-4">
+        <h2 style="color:#fff;font-size:18px;font-weight:700;">Логи агентов</h2>
+        <div class="flex gap-2 items-center flex-wrap">
+          <input id="log-filter" class="inp" type="text" placeholder="Фильтр по агенту..." style="width:180px;">
+          <span style="font-size:11px;color:#6b7fa3;" id="logs-last-refresh"></span>
+          <button class="btn btn-gray" onclick="loadLogs()" style="font-size:12px;">&#8635; Обновить</button>
+        </div>
+      </div>
+      <div class="card log-area" id="logs-container" style="max-height:calc(100vh - 200px);overflow-y:auto;padding:0;">
+        <div id="logs-content" style="padding:12px;">
+          <span style="color:#6b7fa3;">Загрузка...</span>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
 
 <script>
-const API = window.location.protocol + '//' + window.location.hostname + ':8000';
+'use strict';
 
-function showSection(name) {
-  document.querySelectorAll('[id^="section-"]').forEach(el => el.classList.add('hidden'));
-  document.getElementById('section-' + name).classList.remove('hidden');
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
-  loadSection(name);
+// ─── API base ───────────────────────────────────────────────────────────────
+const API = window.location.protocol + '//' + window.location.hostname + ':8001';
+
+// ─── State ──────────────────────────────────────────────────────────────────
+let currentSection = 'dashboard';
+let approvalsTimer = null;
+let logsTimer = null;
+let dashTimer = null;
+let chatHistory = [];
+let currentAgentForRun = null;
+let allLogs = [];
+
+// ─── Utils ──────────────────────────────────────────────────────────────────
+async function apiFetch(path, opts = {}) {
+  try {
+    const r = await fetch(API + path, {
+      headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+      ...opts
+    });
+    if (!r.ok) {
+      const text = await r.text().catch(() => '');
+      return { _error: `HTTP ${r.status}: ${text.slice(0, 200)}` };
+    }
+    return await r.json();
+  } catch (e) {
+    return { _error: 'API недоступен: ' + e.message };
+  }
 }
 
-async function api(path) {
+function fmt(dt) {
+  if (!dt) return '—';
   try {
-    const r = await fetch(API + path);
-    if (!r.ok) return null;
-    return await r.json();
-  } catch { return null; }
+    const d = new Date(dt);
+    return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  } catch { return String(dt).slice(0, 16); }
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function riskBadge(r) {
-  return `<span class="badge-${(r||'low').toLowerCase()} text-[10px] px-2 py-0.5 rounded font-mono">${r||'LOW'}</span>`;
-}
-function statusBadge(s) {
-  const cls = s === 'pending' ? 'badge-pending' : s === 'approved' ? 'badge-approved' : s === 'rejected' ? 'badge-rejected' : 'badge-medium';
-  return `<span class="${cls} text-[10px] px-2 py-0.5 rounded font-mono">${s}</span>`;
+  const lv = (r || 'low').toLowerCase();
+  const icon = lv === 'high' ? '&#128308;' : lv === 'medium' ? '&#128993;' : '&#128994;';
+  return `<span class="badge badge-${lv}">${icon} ${(r||'LOW').toUpperCase()}</span>`;
 }
 
+function statusBadge(s) {
+  const cls = s || 'pending';
+  const map = { pending:'Ожидает', in_progress:'В работе', done:'Готово', failed:'Ошибка',
+                approved:'Одобрено', rejected:'Отклонено', active:'Активен', idle:'Ожидание', error:'Ошибка',
+                ok:'OK', running:'Запущен' };
+  return `<span class="badge badge-${cls}">${escHtml(map[cls] || cls)}</span>`;
+}
+
+function priorityBadge(p) {
+  const map = { low:'#6b7fa3', medium:'#ffc800', high:'#ff5555', critical:'#ff1744' };
+  const color = map[(p||'').toLowerCase()] || '#6b7fa3';
+  return `<span style="color:${color};font-size:12px;font-weight:600;">${escHtml(p||'—')}</span>`;
+}
+
+// ─── Clock ──────────────────────────────────────────────────────────────────
+function updateClock() {
+  const el = document.getElementById('header-time');
+  if (el) el.textContent = new Date().toLocaleString('ru-RU', {
+    day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit'
+  });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ─── Navigation ─────────────────────────────────────────────────────────────
+function showSection(name, btn) {
+  // hide all
+  document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  // update nav
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  currentSection = name;
+  // clear old timers
+  clearInterval(approvalsTimer);
+  clearInterval(logsTimer);
+  // load section data
+  if (name === 'dashboard')  { loadDashboard(); }
+  if (name === 'chat')       { loadChatProviders(); }
+  if (name === 'approvals')  { loadApprovals(); approvalsTimer = setInterval(loadApprovals, 10000); }
+  if (name === 'agents')     { loadAgents(); }
+  if (name === 'tasks')      { loadTasks(); }
+  if (name === 'projects')   { loadProjects(); }
+  if (name === 'logs')       { loadLogs(); logsTimer = setInterval(loadLogs, 5000); }
+}
+
+// ─── Health check ───────────────────────────────────────────────────────────
 async function checkHealth() {
-  const data = await api('/health');
+  const data = await apiFetch('/health');
   const dot = document.getElementById('health-dot');
   const text = document.getElementById('health-text');
   if (data && data.status === 'ok') {
-    dot.className = 'w-2 h-2 rounded-full bg-green-400';
-    text.textContent = 'Online';
-    text.className = 'text-xs text-green-400';
+    dot.className = 'dot dot-green';
+    text.textContent = 'Онлайн';
+    text.style.color = '#00c864';
     return data;
   } else {
-    dot.className = 'w-2 h-2 rounded-full bg-red-400';
-    text.textContent = 'Offline';
-    text.className = 'text-xs text-red-400';
+    dot.className = 'dot dot-red';
+    text.textContent = 'Нет связи';
+    text.style.color = '#ff5555';
     return null;
   }
 }
 
+// ─── DASHBOARD ──────────────────────────────────────────────────────────────
 async function loadDashboard() {
-  const health = await checkHealth();
-
-  // Services
-  const services = document.getElementById('services-list');
-  if (health && health.services) {
-    services.innerHTML = Object.entries(health.services).map(([k, v]) => `
-      <div class="flex items-center justify-between">
-        <span class="text-xs text-cyber-text font-mono">${k}</span>
-        <span class="text-[10px] px-2 py-0.5 rounded ${v === 'ok' ? 'badge-low' : 'badge-high'}">${v}</span>
-      </div>
-    `).join('');
-  } else {
-    services.innerHTML = '<p class="text-xs text-red-400">API not reachable</p>';
-  }
-
-  // Stats
-  const [approvals, agents, tasks, projects] = await Promise.all([
-    api('/api/approvals?status=pending'),
-    api('/api/agents/status'),
-    api('/api/tasks'),
-    api('/api/projects'),
+  const [health, approvals, tasks, aiStatus, finance, logs] = await Promise.all([
+    apiFetch('/health'),
+    apiFetch('/api/approvals?status=pending'),
+    apiFetch('/api/tasks?limit=20'),
+    apiFetch('/api/ai/status'),
+    apiFetch('/api/finance/usage'),
+    apiFetch('/api/logs/agent?limit=5')
   ]);
 
-  document.getElementById('stat-pending').textContent = approvals?.length ?? '—';
-  document.getElementById('stat-agents').textContent = agents?.length ?? '—';
-  document.getElementById('stat-tasks').textContent = tasks?.length ?? '—';
-  document.getElementById('stat-projects').textContent = projects?.length ?? '—';
+  // Header health
+  if (health && health.status === 'ok') {
+    document.getElementById('health-dot').className = 'dot dot-green';
+    document.getElementById('health-text').textContent = 'Онлайн';
+    document.getElementById('health-text').style.color = '#00c864';
+  } else {
+    document.getElementById('health-dot').className = 'dot dot-red';
+    document.getElementById('health-text').textContent = 'Нет связи';
+    document.getElementById('health-text').style.color = '#ff5555';
+  }
+
+  // DB / Redis stats
+  const dbStatus = health?.services?.db;
+  const redisStatus = health?.services?.redis;
+  const dbEl = document.getElementById('stat-db');
+  if (dbEl) {
+    dbEl.textContent = dbStatus === 'ok' ? '✓' : dbStatus || '✗';
+    dbEl.style.color = dbStatus === 'ok' ? '#00c864' : '#ff5555';
+  }
+  const redisEl = document.getElementById('stat-redis');
+  if (redisEl) {
+    redisEl.textContent = redisStatus === 'ok' ? '✓' : redisStatus || '✗';
+    redisEl.style.color = redisStatus === 'ok' ? '#00c864' : '#ff5555';
+  }
+
+  // Pending approvals
+  const pendingCount = approvals?.total ?? approvals?.items?.length ?? 0;
+  const pendEl = document.getElementById('stat-pending');
+  if (pendEl) {
+    pendEl.textContent = approvals?._error ? '?' : pendingCount;
+    pendEl.style.color = pendingCount > 0 ? '#ff5555' : '#6b7fa3';
+  }
+  // Update nav badge
+  const navBadge = document.getElementById('nav-pending-badge');
+  if (navBadge) {
+    navBadge.innerHTML = pendingCount > 0 ? `<span class="pending-badge">${pendingCount}</span>` : '';
+  }
+
+  // Tasks
+  const tasksCount = tasks?.items?.length ?? 0;
+  const taskEl = document.getElementById('stat-tasks');
+  if (taskEl) {
+    taskEl.textContent = tasks?._error ? '?' : tasksCount;
+  }
+
+  // AI providers
+  const aiCount = aiStatus?.total ?? (aiStatus?.providers?.length) ?? 0;
+  const aiEl = document.getElementById('stat-ai');
+  if (aiEl) aiEl.textContent = aiStatus?._error ? '?' : aiCount;
+
+  // Finance
+  const costEl = document.getElementById('stat-cost');
+  if (costEl) {
+    if (finance?._error) costEl.textContent = '?';
+    else costEl.textContent = '$' + (finance?.total_cost_usd ?? 0).toFixed(4);
+  }
+
+  // Services panel
+  const servEl = document.getElementById('dash-services');
+  if (servEl) {
+    if (health?._error || !health) {
+      servEl.innerHTML = '<span style="color:#ff5555;font-size:12px;">API недоступен</span>';
+    } else {
+      const services = health.services || {};
+      let html = '';
+      // Always show API online
+      html += `<div style="display:flex;align-items:center;gap:6px;background:rgba(0,200,100,0.07);border:1px solid rgba(0,200,100,0.2);border-radius:6px;padding:5px 10px;">
+                 <span class="dot dot-green"></span><span style="font-size:12px;font-family:'Courier New',monospace;">API</span>
+                 <span class="badge badge-ok" style="margin-left:4px;">OK</span>
+               </div>`;
+      for (const [k, v] of Object.entries(services)) {
+        const ok = v === 'ok';
+        html += `<div style="display:flex;align-items:center;gap:6px;background:${ok?'rgba(0,200,100,0.07)':'rgba(255,60,60,0.07)'};border:1px solid ${ok?'rgba(0,200,100,0.2)':'rgba(255,60,60,0.2)'};border-radius:6px;padding:5px 10px;">
+                   <span class="dot dot-${ok?'green':'red'}"></span>
+                   <span style="font-size:12px;font-family:'Courier New',monospace;">${escHtml(k)}</span>
+                   <span class="badge badge-${ok?'ok':'error'}" style="margin-left:4px;">${escHtml(v)}</span>
+                 </div>`;
+      }
+      if (health.version) {
+        html += `<span style="font-size:11px;color:#4a5a76;margin-left:4px;align-self:center;">v${escHtml(health.version)}</span>`;
+      }
+      servEl.innerHTML = html;
+    }
+  }
+
+  // Last logs
+  const logsEl = document.getElementById('dash-logs');
+  if (logsEl) {
+    if (logs?._error || !logs?.items?.length) {
+      logsEl.innerHTML = '<span style="color:#6b7fa3;">Нет записей</span>';
+    } else {
+      logsEl.innerHTML = logs.items.slice(0, 5).map(l => renderLogRow(l)).join('');
+    }
+  }
 }
 
-async function loadSection(name) {
-  if (name === 'dashboard') { loadDashboard(); return; }
+// ─── AI CHAT ────────────────────────────────────────────────────────────────
+async function loadChatProviders() {
+  const data = await apiFetch('/api/ai/status');
+  const sel = document.getElementById('chat-provider');
+  if (!sel) return;
+  sel.innerHTML = '';
+  if (data?._error || !data?.providers?.length) {
+    sel.innerHTML = '<option value="">— провайдер недоступен —</option>';
+    return;
+  }
+  // default empty option
+  const defOpt = document.createElement('option');
+  defOpt.value = '';
+  defOpt.textContent = '— авто (' + (data.priority_order?.[0] || 'default') + ') —';
+  sel.appendChild(defOpt);
+  for (const p of data.providers) {
+    const opt = document.createElement('option');
+    opt.value = typeof p === 'string' ? p : p.name || p.provider || String(p);
+    opt.textContent = typeof p === 'string' ? p : p.name || p.provider || String(p);
+    sel.appendChild(opt);
+  }
+}
 
-  if (name === 'agents') {
-    const data = await api('/api/agents/status');
-    const el = document.getElementById('agents-list');
-    if (!data || !data.length) { el.innerHTML = '<p class="text-xs text-cyber-dim">No agents data</p>'; return; }
-    el.innerHTML = data.map(a => `
-      <div class="card p-3 flex items-center justify-between">
-        <div>
-          <p class="text-sm text-white font-mono">${a.name}</p>
-          <p class="text-xs text-cyber-dim">${a.description || ''}</p>
+function addChatMessage(role, text, meta) {
+  const messages = document.getElementById('chat-messages');
+  if (!messages) return;
+  // Remove placeholder
+  const placeholder = messages.querySelector('[data-placeholder]');
+  if (placeholder) placeholder.remove();
+
+  const isUser = role === 'user';
+  const div = document.createElement('div');
+  div.style.display = 'flex';
+  div.style.flexDirection = 'column';
+  div.style.alignItems = isUser ? 'flex-end' : 'flex-start';
+
+  const bubble = document.createElement('div');
+  bubble.className = isUser ? 'bubble-user' : 'bubble-ai';
+  bubble.style.maxWidth = '80%';
+  bubble.style.padding = '10px 14px';
+  bubble.style.fontSize = '13px';
+  bubble.style.lineHeight = '1.6';
+  bubble.style.whiteSpace = 'pre-wrap';
+  bubble.style.wordBreak = 'break-word';
+  bubble.textContent = text;
+
+  div.appendChild(bubble);
+
+  if (meta) {
+    const metaDiv = document.createElement('div');
+    metaDiv.style.fontSize = '10px';
+    metaDiv.style.color = '#4a5a76';
+    metaDiv.style.marginTop = '4px';
+    metaDiv.style.fontFamily = "'Courier New', monospace";
+    metaDiv.textContent = meta;
+    div.appendChild(metaDiv);
+  }
+
+  messages.appendChild(div);
+  chatHistory.push({ role, text, meta });
+
+  // Scroll to bottom
+  const win = document.getElementById('chat-window');
+  if (win) win.scrollTop = win.scrollHeight;
+}
+
+function addChatSpinner() {
+  const messages = document.getElementById('chat-messages');
+  if (!messages) return;
+  const div = document.createElement('div');
+  div.id = 'chat-spinner';
+  div.style.display = 'flex';
+  div.style.alignItems = 'center';
+  div.style.gap = '8px';
+  div.innerHTML = `<span class="spin" style="font-size:16px;">&#9899;</span><span style="color:#6b7fa3;font-size:12px;">AI думает...</span>`;
+  messages.appendChild(div);
+  const win = document.getElementById('chat-window');
+  if (win) win.scrollTop = win.scrollHeight;
+}
+
+function removeChatSpinner() {
+  const sp = document.getElementById('chat-spinner');
+  if (sp) sp.remove();
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const sendBtn = document.getElementById('chat-send-btn');
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+
+  const provider = document.getElementById('chat-provider')?.value || undefined;
+  const model = document.getElementById('chat-model')?.value.trim() || undefined;
+  const system = document.getElementById('chat-system')?.value.trim() || undefined;
+
+  input.value = '';
+  sendBtn.disabled = true;
+  sendBtn.innerHTML = '<span class="spin">&#9899;</span>';
+
+  addChatMessage('user', text);
+  addChatSpinner();
+
+  const body = { prompt: text };
+  if (provider) body.provider = provider;
+  if (model) body.model = model;
+  if (system) body.system = system;
+
+  const res = await apiFetch('/api/ai/chat', {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+
+  removeChatSpinner();
+  sendBtn.disabled = false;
+  sendBtn.innerHTML = '&#9658;';
+
+  if (res?._error) {
+    addChatMessage('ai', 'Ошибка: ' + res._error);
+  } else {
+    const meta = [res.provider, res.model, res.tokens_in ? `in:${res.tokens_in}` : '', res.tokens_out ? `out:${res.tokens_out}` : ''].filter(Boolean).join(' · ');
+    addChatMessage('ai', res.text || '(пустой ответ)', meta);
+  }
+}
+
+function clearChat() {
+  chatHistory = [];
+  const messages = document.getElementById('chat-messages');
+  if (messages) {
+    messages.innerHTML = `<div data-placeholder style="text-align:center;color:#4a5a76;font-size:12px;padding:40px 0;">Начните диалог с AI &#8595;</div>`;
+  }
+}
+
+// Enter to send (Shift+Enter = newline)
+document.addEventListener('DOMContentLoaded', () => {
+  const inp = document.getElementById('chat-input');
+  if (inp) {
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChat();
+      }
+    });
+  }
+});
+
+// ─── APPROVALS ──────────────────────────────────────────────────────────────
+async function loadApprovals() {
+  const data = await apiFetch('/api/approvals?status=pending');
+  const el = document.getElementById('approvals-list');
+  const refreshEl = document.getElementById('approvals-last-refresh');
+  if (refreshEl) refreshEl.textContent = 'обновлено ' + new Date().toLocaleTimeString('ru-RU');
+
+  if (!el) return;
+
+  if (data?._error) {
+    el.innerHTML = `<div style="color:#ff5555;font-size:13px;padding:20px 0;">Ошибка: ${escHtml(data._error)}</div>`;
+    return;
+  }
+
+  const items = data?.items || [];
+
+  // Update nav badge
+  const navBadge = document.getElementById('nav-pending-badge');
+  if (navBadge) {
+    navBadge.innerHTML = items.length > 0 ? `<span class="pending-badge">${items.length}</span>` : '';
+  }
+
+  if (!items.length) {
+    el.innerHTML = `<div class="card" style="padding:40px;text-align:center;color:#6b7fa3;font-size:13px;">
+      <div style="font-size:32px;margin-bottom:8px;">&#10003;</div>
+      Нет ожидающих согласований
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = items.map(a => `
+    <div class="card card-hover" id="approval-${escHtml(a.id)}" style="padding:16px;margin-bottom:12px;">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;color:#fff;font-size:14px;margin-bottom:3px;">${escHtml(a.action || '—')}</div>
+          <div style="font-size:11px;color:#6b7fa3;font-family:'Courier New',monospace;">
+            ${escHtml(a.agent || '—')} &nbsp;·&nbsp; ${fmt(a.requested_at)}
+          </div>
         </div>
-        <div class="flex items-center gap-2">
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;">
           ${riskBadge(a.risk_level)}
-          ${statusBadge(a.status || 'idle')}
+          ${statusBadge(a.status)}
         </div>
       </div>
-    `).join('');
-  }
-
-  if (name === 'approvals') {
-    const data = await api('/api/approvals');
-    const el = document.getElementById('approvals-list');
-    if (!data || !data.length) { el.innerHTML = '<p class="text-xs text-cyber-dim">No approval requests</p>'; return; }
-    el.innerHTML = data.map(a => `
-      <div class="card p-4">
-        <div class="flex items-start justify-between mb-2">
-          <div>
-            <p class="text-sm text-white font-mono">${a.action}</p>
-            <p class="text-xs text-cyber-dim">${a.agent} · ${a.requested_at?.slice(0,16) || ''}</p>
-          </div>
-          <div class="flex gap-1.5">
-            ${riskBadge(a.risk_level)}
-            ${statusBadge(a.status)}
-          </div>
-        </div>
-        <p class="text-xs text-cyber-text mb-3">${a.description}</p>
-        ${a.status === 'pending' ? `
-          <div class="flex gap-2">
-            <button onclick="approveRequest('${a.id}')" class="px-3 py-1 text-xs rounded bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30">✅ Подтвердить</button>
-            <button onclick="rejectRequest('${a.id}')" class="px-3 py-1 text-xs rounded bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30">❌ Отказать</button>
-          </div>
-        ` : ''}
-      </div>
-    `).join('');
-  }
-
-  if (name === 'tasks') {
-    const data = await api('/api/tasks');
-    const el = document.getElementById('tasks-list');
-    if (!data || !data.length) { el.innerHTML = '<p class="text-xs text-cyber-dim">No tasks</p>'; return; }
-    el.innerHTML = data.map(t => `
-      <div class="card p-3 flex items-center justify-between">
-        <div>
-          <p class="text-sm text-white font-mono">${t.title}</p>
-          <p class="text-xs text-cyber-dim">${t.agent || 'unassigned'} · ${t.created_at?.slice(0,10) || ''}</p>
-        </div>
-        ${statusBadge(t.status)}
-      </div>
-    `).join('');
-  }
-
-  if (name === 'projects') {
-    const data = await api('/api/projects');
-    const el = document.getElementById('projects-list');
-    if (!data || !data.length) { el.innerHTML = '<p class="text-xs text-cyber-dim">No projects</p>'; return; }
-    el.innerHTML = data.map(p => `
-      <div class="card p-3 flex items-center justify-between">
-        <div>
-          <p class="text-sm text-white font-mono">${p.name}</p>
-          <p class="text-xs text-cyber-dim">${p.description || ''}</p>
-        </div>
-        ${statusBadge(p.status)}
-      </div>
-    `).join('');
-  }
-
-  if (name === 'logs') {
-    const data = await api('/api/logs/agents?limit=50');
-    const el = document.getElementById('logs-list');
-    if (!data || !data.length) { el.innerHTML = '<p class="text-cyber-dim">No logs</p>'; return; }
-    el.innerHTML = data.map(l => `
-      <div class="flex items-start gap-3 border-b border-cyber-border/30 py-1.5">
-        <span class="text-cyber-dim shrink-0">${l.timestamp?.slice(0,19) || ''}</span>
-        <span class="text-cyan-400 shrink-0">[${l.agent_name}]</span>
-        <span class="${l.risk_level === 'HIGH' ? 'text-red-400' : l.risk_level === 'MEDIUM' ? 'text-yellow-400' : 'text-green-400'} shrink-0">${l.risk_level}</span>
-        <span class="text-cyber-text">${l.action}</span>
-      </div>
-    `).join('');
-  }
+      ${a.description ? `<div style="font-size:12px;color:#a0b0cc;background:rgba(0,0,0,0.2);border-radius:6px;padding:8px 10px;margin-bottom:12px;">${escHtml(a.description)}</div>` : ''}
+      ${a.status === 'pending' ? `
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-green" onclick="approveApproval('${escHtml(a.id)}')">&#10003; Одобрить</button>
+        <button class="btn btn-red" onclick="rejectApproval('${escHtml(a.id)}')">&#10007; Отклонить</button>
+      </div>` : ''}
+    </div>
+  `).join('');
 }
 
-async function approveRequest(id) {
-  await fetch(API + '/api/approvals/' + id + '/approve', {
+async function approveApproval(id) {
+  const cardEl = document.getElementById('approval-' + id);
+  if (cardEl) cardEl.style.opacity = '0.5';
+  const res = await apiFetch('/api/approvals/' + encodeURIComponent(id) + '/approve', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({decided_by: 'web_panel', reason: 'Approved via Web Panel'})
+    body: JSON.stringify({ decided_by: 'web', reason: 'Одобрено через веб-панель' })
   });
-  loadSection('approvals');
+  if (res?._error) {
+    alert('Ошибка: ' + res._error);
+    if (cardEl) cardEl.style.opacity = '1';
+  } else {
+    loadApprovals();
+  }
 }
 
-async function rejectRequest(id) {
-  await fetch(API + '/api/approvals/' + id + '/reject', {
+async function rejectApproval(id) {
+  const reason = prompt('Причина отклонения (необязательно):') ?? '';
+  const cardEl = document.getElementById('approval-' + id);
+  if (cardEl) cardEl.style.opacity = '0.5';
+  const res = await apiFetch('/api/approvals/' + encodeURIComponent(id) + '/reject', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({decided_by: 'web_panel', reason: 'Rejected via Web Panel'})
+    body: JSON.stringify({ decided_by: 'web', reason: reason || 'Отклонено через веб-панель' })
   });
-  loadSection('approvals');
+  if (res?._error) {
+    alert('Ошибка: ' + res._error);
+    if (cardEl) cardEl.style.opacity = '1';
+  } else {
+    loadApprovals();
+  }
 }
 
+// ─── AGENTS ─────────────────────────────────────────────────────────────────
+async function loadAgents() {
+  const data = await apiFetch('/api/agents/status');
+  const tbody = document.getElementById('agents-tbody');
+  if (!tbody) return;
+
+  if (data?._error) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:#ff5555;text-align:center;padding:24px;">Ошибка: ${escHtml(data._error)}</td></tr>`;
+    return;
+  }
+
+  const agents = data?.agents ? Object.values(data.agents) : (Array.isArray(data) ? data : []);
+
+  if (!agents.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:#6b7fa3;text-align:center;padding:24px;">Нет данных об агентах</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = agents.map(a => {
+    const name = a.name || '—';
+    const status = (a.status || 'idle').toLowerCase();
+    const dotCls = status === 'active' || status === 'running' ? 'dot-green' : status === 'error' ? 'dot-red' : 'dot-yellow';
+    return `<tr>
+      <td style="font-family:'Courier New',monospace;font-weight:600;color:#fff;">${escHtml(name)}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="dot ${dotCls}"></span>
+          ${statusBadge(status)}
+        </div>
+      </td>
+      <td style="color:#a0b0cc;font-size:12px;max-width:300px;">${escHtml(a.description || '—')}</td>
+      <td>
+        <button class="btn btn-cyan" style="font-size:12px;" onclick="openRunModal('${escHtml(name)}')">&#9654; Запустить</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openRunModal(agentName) {
+  currentAgentForRun = agentName;
+  document.getElementById('modal-agent-name').textContent = 'Агент: ' + agentName;
+  document.getElementById('modal-task-input').value = '';
+  const resultEl = document.getElementById('modal-result');
+  resultEl.className = 'mt-3 text-xs font-mono hidden';
+  resultEl.textContent = '';
+  document.getElementById('modal-run').style.display = 'flex';
+  setTimeout(() => document.getElementById('modal-task-input').focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById('modal-run').style.display = 'none';
+  currentAgentForRun = null;
+}
+
+// Close modal on backdrop click
+document.getElementById('modal-run').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+async function submitAgentRun() {
+  if (!currentAgentForRun) return;
+  const task = document.getElementById('modal-task-input').value.trim();
+  if (!task) { alert('Введите задачу'); return; }
+
+  const resultEl = document.getElementById('modal-result');
+  resultEl.className = 'mt-3 text-xs font-mono';
+  resultEl.style.color = '#6b7fa3';
+  resultEl.textContent = '⏳ Запускаю...';
+
+  const res = await apiFetch('/api/agents/' + encodeURIComponent(currentAgentForRun) + '/run', {
+    method: 'POST',
+    body: JSON.stringify({ task, params: {} })
+  });
+
+  if (res?._error) {
+    resultEl.style.color = '#ff5555';
+    resultEl.textContent = 'Ошибка: ' + res._error;
+  } else {
+    resultEl.style.color = '#00c864';
+    resultEl.textContent = '✓ Задача отправлена: ' + JSON.stringify(res).slice(0, 200);
+    setTimeout(closeModal, 2000);
+  }
+}
+
+// ─── TASKS ──────────────────────────────────────────────────────────────────
+async function loadTasks() {
+  const data = await apiFetch('/api/tasks?limit=20');
+  const tbody = document.getElementById('tasks-tbody');
+  if (!tbody) return;
+
+  if (data?._error) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:#ff5555;text-align:center;padding:24px;">Ошибка: ${escHtml(data._error)}</td></tr>`;
+    return;
+  }
+
+  const items = data?.items || (Array.isArray(data) ? data : []);
+
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:#6b7fa3;text-align:center;padding:24px;">Задач нет</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = items.map(t => `<tr>
+    <td style="color:#fff;font-size:13px;">${escHtml(t.title || t.name || '—')}</td>
+    <td style="font-family:'Courier New',monospace;font-size:12px;color:#6b7fa3;">${escHtml(t.agent || '—')}</td>
+    <td>${statusBadge(t.status || 'pending')}</td>
+    <td>${priorityBadge(t.priority)}</td>
+  </tr>`).join('');
+}
+
+// ─── PROJECTS ───────────────────────────────────────────────────────────────
+async function loadProjects() {
+  const data = await apiFetch('/api/projects');
+  const grid = document.getElementById('projects-grid');
+  if (!grid) return;
+
+  if (data?._error) {
+    grid.innerHTML = `<div style="color:#ff5555;font-size:13px;">Ошибка: ${escHtml(data._error)}</div>`;
+    return;
+  }
+
+  const items = data?.items || (Array.isArray(data) ? data : []);
+
+  if (!items.length) {
+    grid.innerHTML = `<div style="color:#6b7fa3;font-size:13px;padding:20px 0;">Проектов нет</div>`;
+    return;
+  }
+
+  grid.innerHTML = items.map(p => `
+    <div class="card card-hover" style="padding:16px;flex:1;min-width:220px;max-width:340px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+        <div style="font-weight:700;color:#fff;font-size:14px;">${escHtml(p.name || '—')}</div>
+        ${statusBadge(p.status || 'pending')}
+      </div>
+      ${p.description ? `<div style="font-size:12px;color:#6b7fa3;line-height:1.5;">${escHtml(p.description)}</div>` : ''}
+      ${p.id ? `<div style="font-size:10px;color:#2a3a54;margin-top:8px;font-family:'Courier New',monospace;">#${escHtml(String(p.id))}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+// ─── LOGS ───────────────────────────────────────────────────────────────────
+function renderLogRow(l) {
+  const ts = l.timestamp ? String(l.timestamp).slice(0, 19).replace('T', ' ') : '—';
+  const agent = escHtml(l.agent_name || l.agent || '—');
+  const action = escHtml(l.action || '—');
+  const result = escHtml(String(l.result || '').slice(0, 120));
+  const ok = String(l.result || '').toLowerCase().includes('error') || String(l.result || '').toLowerCase().includes('fail') ? false : true;
+  return `<div style="display:grid;grid-template-columns:130px 110px 1fr;gap:8px;padding:5px 12px;border-bottom:1px solid rgba(30,45,74,0.4);">
+    <span style="color:#4a5a76;white-space:nowrap;overflow:hidden;">${ts}</span>
+    <span style="color:#00d4ff;white-space:nowrap;overflow:hidden;">[${agent}]</span>
+    <span style="color:${ok?'#a0b0cc':'#ff8888'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${action}: ${escHtml(String(l.result||''))}">${action}${result ? ' → ' + result : ''}</span>
+  </div>`;
+}
+
+async function loadLogs() {
+  const data = await apiFetch('/api/logs/agent?limit=30');
+  const refreshEl = document.getElementById('logs-last-refresh');
+  if (refreshEl) refreshEl.textContent = 'обновлено ' + new Date().toLocaleTimeString('ru-RU');
+
+  if (data?._error) {
+    document.getElementById('logs-content').innerHTML = `<span style="color:#ff5555;">Ошибка: ${escHtml(data._error)}</span>`;
+    return;
+  }
+
+  allLogs = data?.items || (Array.isArray(data) ? data : []);
+  renderFilteredLogs();
+
+  // Auto-scroll to bottom
+  const container = document.getElementById('logs-container');
+  if (container) container.scrollTop = container.scrollHeight;
+}
+
+function renderFilteredLogs() {
+  const filter = (document.getElementById('log-filter')?.value || '').toLowerCase().trim();
+  const el = document.getElementById('logs-content');
+  if (!el) return;
+  const items = filter ? allLogs.filter(l => (l.agent_name || l.agent || '').toLowerCase().includes(filter)) : allLogs;
+  if (!items.length) {
+    el.innerHTML = `<span style="color:#6b7fa3;padding:12px 0;display:block;">Нет записей${filter ? ' по фильтру "' + escHtml(filter) + '"' : ''}</span>`;
+    return;
+  }
+  el.innerHTML = items.map(l => renderLogRow(l)).join('');
+}
+
+// Log filter listener
+document.addEventListener('DOMContentLoaded', () => {
+  const f = document.getElementById('log-filter');
+  if (f) f.addEventListener('input', renderFilteredLogs);
+});
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
 // Initial load
 loadDashboard();
-setInterval(checkHealth, 30000);
+
+// Dashboard auto-refresh every 30s
+dashTimer = setInterval(() => {
+  if (currentSection === 'dashboard') loadDashboard();
+}, 30000);
 </script>
 </body>
 </html>

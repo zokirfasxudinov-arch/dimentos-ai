@@ -38,7 +38,7 @@ services:
     container_name: dimentos_api
     env_file: .env
     ports:
-      - "8000:8000"
+      - "8001:8000"
     depends_on:
       postgres:
         condition: service_healthy

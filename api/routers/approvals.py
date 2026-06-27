@@ -4,19 +4,43 @@ Agents submit actions here; the owner approves/rejects via Telegram or this API.
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException
+from loguru import logger
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.config import settings
 from core.database import get_db
 from core.models import ApprovalRequest
 
 router = APIRouter()
+
+APPROVAL_CHANNEL = "dimentos:approvals"
+
+
+async def _notify_bot(approval_id: str, agent: str, action: str, description: str, risk_level: str):
+    """Publish approval event to Redis so the bot can send a Telegram notification."""
+    try:
+        r = aioredis.from_url(settings.redis_url)
+        payload = json.dumps({
+            "approval_id": approval_id,
+            "agent": agent,
+            "action": action,
+            "description": description,
+            "risk_level": risk_level,
+        })
+        await r.publish(APPROVAL_CHANNEL, payload)
+        await r.aclose()
+        logger.info(f"Published approval {approval_id} to Redis channel")
+    except Exception as e:
+        logger.warning(f"Failed to publish approval to Redis: {e}")
 
 
 class CreateApprovalRequest(BaseModel):
@@ -65,6 +89,9 @@ async def create_approval(
     )
     db.add(req)
     await db.flush()
+
+    await _notify_bot(req.id, body.agent, body.action, body.description, body.risk_level)
+
     return {"id": req.id, "status": "pending", "message": "Approval request created"}
 
 

@@ -5,8 +5,8 @@ No secrets are hardcoded here.
 """
 from __future__ import annotations
 
-from typing import Optional
-from pydantic import Field
+from typing import Optional, Any
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,6 +21,16 @@ class Settings(BaseSettings):
     # Telegram
     telegram_bot_token: str = Field(default="", description="Telegram bot token")
     telegram_owner_id: Optional[int] = Field(default=None, description="Telegram owner user ID")
+
+    @field_validator("telegram_owner_id", mode="before")
+    @classmethod
+    def parse_owner_id(cls, v: Any) -> Optional[int]:
+        if v is None or v == "" or str(v).strip() == "":
+            return None
+        try:
+            return int(v)
+        except (ValueError, TypeError):
+            return None
 
     # Database
     postgres_user: str = Field(default="dimentos")
@@ -47,6 +57,8 @@ class Settings(BaseSettings):
     gemini_api_key: str = Field(default="")
     mistral_api_key: str = Field(default="")
     openrouter_api_key: str = Field(default="")
+    openrouter_api_key_2: str = Field(default="")
+    groq_api_key: str = Field(default="")
     deepseek_api_key: str = Field(default="")
     perplexity_api_key: str = Field(default="")
 
@@ -71,18 +83,36 @@ class Settings(BaseSettings):
         return bool(self.anthropic_api_key)
 
     @property
+    def has_groq(self) -> bool:
+        return bool(self.groq_api_key)
+
+    @property
+    def has_gemini(self) -> bool:
+        return bool(self.gemini_api_key)
+
+    @property
+    def has_openrouter(self) -> bool:
+        return bool(self.openrouter_api_key or self.openrouter_api_key_2)
+
+    @property
+    def active_openrouter_key(self) -> str:
+        return self.openrouter_api_key or self.openrouter_api_key_2
+
+    @property
     def available_providers(self) -> list[str]:
         providers = []
         if self.has_openai:
             providers.append("openai")
         if self.has_anthropic:
             providers.append("anthropic")
-        if self.gemini_api_key:
+        if self.has_gemini:
             providers.append("gemini")
+        if self.has_groq:
+            providers.append("groq")
+        if self.has_openrouter:
+            providers.append("openrouter")
         if self.mistral_api_key:
             providers.append("mistral")
-        if self.openrouter_api_key:
-            providers.append("openrouter")
         if self.deepseek_api_key:
             providers.append("deepseek")
         if self.perplexity_api_key:

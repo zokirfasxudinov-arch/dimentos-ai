@@ -1,0 +1,899 @@
+"""
+Dimentos AI Studio OS - Telegram Menu System
+Inline keyboard navigation for all sections.
+All callback_data use prefix: menu:<section>[:<sub>][:<id>]
+"""
+from __future__ import annotations
+
+import json
+from typing import Union
+
+import httpx
+from loguru import logger
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message, CallbackQuery
+from telegram.ext import ContextTypes
+
+from core.config import settings
+
+API_BASE = f"http://localhost:{settings.api_port}"
+
+
+# ──────────────────────────────────────────────
+# Keyboard builders
+# ──────────────────────────────────────────────
+
+def kb_main() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🟢 Состояние системы", callback_data="menu:status"),
+            InlineKeyboardButton("📋 Задачи",            callback_data="menu:tasks"),
+        ],
+        [
+            InlineKeyboardButton("🤖 AI-агенты",         callback_data="menu:agents"),
+            InlineKeyboardButton("✅ Подтверждения",     callback_data="menu:approvals"),
+        ],
+        [
+            InlineKeyboardButton("📁 Проекты",           callback_data="menu:projects"),
+            InlineKeyboardButton("🧠 Память",            callback_data="menu:memory"),
+        ],
+        [
+            InlineKeyboardButton("🔗 GitHub",            callback_data="menu:github"),
+            InlineKeyboardButton("📜 Логи",              callback_data="menu:logs"),
+        ],
+        [
+            InlineKeyboardButton("⚙️ Настройки",        callback_data="menu:settings"),
+            InlineKeyboardButton("❓ Помощь",            callback_data="menu:help"),
+        ],
+    ])
+
+
+def kb_back() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("⬅️ Назад", callback_data="menu:main"),
+        InlineKeyboardButton("🏠 Главное меню", callback_data="menu:main"),
+    ]])
+
+
+def kb_back_row() -> list:
+    return [
+        InlineKeyboardButton("⬅️ Назад", callback_data="menu:main"),
+        InlineKeyboardButton("🏠 Главное меню", callback_data="menu:main"),
+    ]
+
+
+# ──────────────────────────────────────────────
+# API helper
+# ──────────────────────────────────────────────
+
+async def _get(path: str) -> dict | None:
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(f"{API_BASE}{path}", timeout=8)
+            if r.status_code == 200:
+                return r.json()
+    except Exception as e:
+        logger.warning(f"API GET {path}: {e}")
+    return None
+
+
+async def _post(path: str, body: dict) -> dict | None:
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.post(f"{API_BASE}{path}", json=body, timeout=8)
+            if r.status_code == 200:
+                return r.json()
+    except Exception as e:
+        logger.warning(f"API POST {path}: {e}")
+    return None
+
+
+# ──────────────────────────────────────────────
+# Send / edit helpers
+# ──────────────────────────────────────────────
+
+async def _reply(update: Update, text: str, keyboard: InlineKeyboardMarkup, parse_mode: str = "HTML") -> None:
+    """Send or edit a message depending on whether this is a callback or a command."""
+    if update.callback_query:
+        try:
+            await update.callback_query.edit_message_text(text, reply_markup=keyboard, parse_mode=parse_mode)
+        except Exception:
+            await update.callback_query.message.reply_text(text, reply_markup=keyboard, parse_mode=parse_mode)
+    elif update.message:
+        await update.message.reply_text(text, reply_markup=keyboard, parse_mode=parse_mode)
+
+
+# ──────────────────────────────────────────────
+# 🏠 Main menu
+# ──────────────────────────────────────────────
+
+async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    text = (
+        "🤖 <b>Dimentos AI Studio OS</b>\n\n"
+        "Выберите, что нужно сделать:"
+    )
+    await _reply(update, text, kb_main())
+
+
+# ──────────────────────────────────────────────
+# 🟢 System status
+# ──────────────────────────────────────────────
+
+async def show_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    health = await _get("/health")
+    ai_status = await _get("/api/ai/status")
+    approvals = await _get("/api/approvals?status=pending")
+    tasks = await _get("/api/tasks?limit=100")
+
+    if not health:
+        text = "❌ <b>API недоступен</b>\n\nПроверь контейнеры Docker."
+        await _reply(update, text, kb_back())
+        return
+
+    db = health.get("services", {}).get("db", "?")
+    redis = health.get("services", {}).get("redis", "?")
+    overall = health.get("status", "unknown")
+
+    db_icon = "🟢" if db == "ok" else "🔴"
+    redis_icon = "🟢" if redis == "ok" else "🔴"
+    overall_icon = "🟢" if overall == "ok" else "🔴"
+
+    providers = ai_status.get("providers", []) if ai_status else []
+    ai_line = f"🤖 <b>AI провайдеры:</b> {', '.join(providers) or 'не настроены'}"
+
+    pending_count = approvals.get("total", 0) if approvals else 0
+    approval_icon = "⚠️" if pending_count > 0 else "✅"
+
+    active_tasks = 0
+    failed_tasks = 0
+    if tasks:
+        for t in tasks.get("items", []):
+            if t.get("status") == "in_progress":
+                active_tasks += 1
+            elif t.get("status") == "failed":
+                failed_tasks += 1
+
+    text = (
+        f"{overall_icon} <b>Состояние системы</b>\n\n"
+        f"{db_icon} База данных (PostgreSQL): <b>{'работает' if db == 'ok' else 'ошибка'}</b>\n"
+        f"{redis_icon} Redis (очередь): <b>{'работает' if redis == 'ok' else 'ошибка'}</b>\n"
+        f"🌐 Веб-панель: <b>порт 3000</b>\n"
+        f"🔗 API: <b>порт 8001</b>\n\n"
+        f"{ai_line}\n\n"
+        f"{approval_icon} Ожидают подтверждения: <b>{pending_count}</b>\n"
+        f"📋 Задач активных: <b>{active_tasks}</b>\n"
+        f"{'❌' if failed_tasks else '✅'} Задач с ошибкой: <b>{failed_tasks}</b>"
+    )
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Обновить", callback_data="menu:status")],
+        kb_back_row(),
+    ])
+    await _reply(update, text, keyboard)
+
+
+# ──────────────────────────────────────────────
+# 📋 Tasks
+# ──────────────────────────────────────────────
+
+async def show_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    data = await _get("/api/tasks?limit=20")
+    if not data:
+        await _reply(update, "❌ Не удалось загрузить задачи.", kb_back())
+        return
+
+    items = data.get("items", [])
+    if not items:
+        await _reply(update, "ℹ️ <b>Задач нет.</b>\n\nАI-агенты ещё не создавали задач.", kb_back())
+        return
+
+    STATUS_ICONS = {
+        "pending":     "🕐",
+        "in_progress": "🔄",
+        "done":        "✅",
+        "failed":      "❌",
+    }
+
+    lines = ["📋 <b>Задачи</b>\n"]
+    buttons = []
+    for task in items[:15]:
+        icon = STATUS_ICONS.get(task.get("status", ""), "❓")
+        title = (task.get("title") or "Без названия")[:40]
+        agent = task.get("agent", "?")
+        lines.append(f"{icon} <b>{title}</b>\n   <i>{agent}</i> · {task.get('status', '?')}")
+        tid = task.get("id", "")
+        if tid:
+            buttons.append([
+                InlineKeyboardButton(f"👁 {title[:20]}", callback_data=f"menu:task:{tid[:8]}"),
+            ])
+
+    buttons.append(kb_back_row())
+    await _reply(update, "\n".join(lines), InlineKeyboardMarkup(buttons))
+
+
+async def show_task_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, task_id: str) -> None:
+    data = await _get(f"/api/tasks/{task_id}")
+    if not data:
+        await _reply(update, f"❌ Задача `{task_id}` не найдена.", kb_back())
+        return
+
+    text = (
+        f"📋 <b>Задача</b>\n\n"
+        f"<b>Название:</b> {data.get('title', '?')}\n"
+        f"<b>Агент:</b> {data.get('agent', '?')}\n"
+        f"<b>Статус:</b> {data.get('status', '?')}\n"
+        f"<b>Приоритет:</b> {data.get('priority', 'medium')}\n"
+        f"<b>Описание:</b> {(data.get('description') or '—')[:200]}"
+    )
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("⏸ Остановить", callback_data=f"task:stop:{task_id}"),
+            InlineKeyboardButton("🔁 Повторить",  callback_data=f"task:retry:{task_id}"),
+        ],
+        [
+            InlineKeyboardButton("🗑 Удалить", callback_data=f"task:delete:{task_id}"),
+        ],
+        kb_back_row(),
+    ])
+    await _reply(update, text, keyboard)
+
+
+# ──────────────────────────────────────────────
+# 🤖 Agents
+# ──────────────────────────────────────────────
+
+async def show_agents(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    data = await _get("/api/agents/status")
+    if not data:
+        await _reply(update, "❌ Не удалось загрузить статусы агентов.", kb_back())
+        return
+
+    agents = data.get("agents", {})
+    if not agents:
+        await _reply(update, "ℹ️ Агенты не зарегистрированы.", kb_back())
+        return
+
+    STATUS_ICONS = {"active": "🟢", "idle": "🟡", "error": "🔴", "stopped": "⭕"}
+    lines = ["🤖 <b>AI-агенты</b>\n"]
+    buttons = []
+
+    for name, info in agents.items():
+        icon = STATUS_ICONS.get(info.get("status", ""), "⭕")
+        desc = (info.get("description") or "")[:50]
+        last = info.get("last_run", "никогда")
+        lines.append(f"{icon} <b>{info.get('name', name)}</b>\n   {desc}\n   Последний запуск: <i>{last}</i>")
+        buttons.append([
+            InlineKeyboardButton(f"▶️ {name}", callback_data=f"agent:run:{name}"),
+            InlineKeyboardButton(f"📜 Логи",   callback_data=f"menu:logs:agent:{name}"),
+        ])
+
+    buttons.append(kb_back_row())
+    await _reply(update, "\n".join(lines), InlineKeyboardMarkup(buttons))
+
+
+# ──────────────────────────────────────────────
+# ✅ Approvals
+# ──────────────────────────────────────────────
+
+async def show_approvals(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    data = await _get("/api/approvals?status=pending")
+    if not data:
+        await _reply(update, "❌ Не удалось загрузить запросы.", kb_back())
+        return
+
+    items = data.get("items", [])
+    if not items:
+        text = (
+            "✅ <b>Подтверждения</b>\n\n"
+            "Нет запросов, ожидающих решения.\n\n"
+            "Когда AI-агент захочет выполнить важное действие, "
+            "уведомление придёт сюда автоматически."
+        )
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔄 Обновить", callback_data="menu:approvals")],
+            kb_back_row(),
+        ])
+        await _reply(update, text, keyboard)
+        return
+
+    text = (
+        f"✅ <b>Подтверждения</b>\n\n"
+        f"Ожидают решения: <b>{len(items)}</b>\n\n"
+        "Выберите запрос для просмотра:"
+    )
+
+    RISK_ICONS = {"LOW": "🟢", "MEDIUM": "🟡", "HIGH": "🔴"}
+    buttons = []
+    for item in items[:8]:
+        risk = item.get("risk_level", "MEDIUM")
+        icon = RISK_ICONS.get(risk, "⚪")
+        agent = item.get("agent", "?")
+        action = (item.get("action") or "?")[:25]
+        iid = item["id"]
+        buttons.append([
+            InlineKeyboardButton(
+                f"{icon} {agent}: {action}",
+                callback_data=f"menu:approval:{iid[:16]}",
+            )
+        ])
+
+    buttons.append([InlineKeyboardButton("🔄 Обновить", callback_data="menu:approvals")])
+    buttons.append(kb_back_row())
+    await _reply(update, text, InlineKeyboardMarkup(buttons))
+
+
+async def show_approval_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, approval_id: str) -> None:
+    # Find the full ID from prefix
+    data = await _get("/api/approvals?status=pending")
+    full_id = approval_id
+    if data:
+        for item in data.get("items", []):
+            if item["id"].startswith(approval_id):
+                full_id = item["id"]
+                break
+
+    detail = await _get(f"/api/approvals/{full_id}")
+    if not detail:
+        await _reply(update, "❌ Запрос не найден.", kb_back())
+        return
+
+    RISK_ICONS = {"LOW": "🟢", "MEDIUM": "🟡", "HIGH": "🔴"}
+    risk = detail.get("risk_level", "MEDIUM")
+    risk_icon = RISK_ICONS.get(risk, "⚪")
+
+    RISK_REASONS = {
+        "LOW":    "Безопасное действие, можно выполнить.",
+        "MEDIUM": "Действие затрагивает данные или внешние системы.",
+        "HIGH":   "⚠️ Критическое действие! Внимательно проверьте перед подтверждением.",
+    }
+
+    text = (
+        f"⚠️ <b>Запрос на подтверждение</b>\n\n"
+        f"<b>Агент:</b> {detail.get('agent', '?')}\n"
+        f"<b>Действие:</b> {detail.get('action', '?')}\n"
+        f"{risk_icon} <b>Риск:</b> {risk}\n\n"
+        f"<b>Что будет сделано:</b>\n{detail.get('description', '?')}\n\n"
+        f"<i>{RISK_REASONS.get(risk, '')}</i>\n\n"
+        f"<code>ID: {full_id[:8]}...</code>"
+    )
+
+    if risk == "HIGH":
+        # For HIGH risk, first show pre-confirmation
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⚠️ Подтвердить (HIGH риск)", callback_data=f"menu:approval:confirm_high:{full_id[:16]}")],
+            [InlineKeyboardButton("❌ Отклонить", callback_data=f"approval:reject:{full_id}")],
+            [InlineKeyboardButton("⬅️ К списку",   callback_data="menu:approvals")],
+        ])
+    else:
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("✅ Подтвердить", callback_data=f"approval:approve:{full_id}"),
+                InlineKeyboardButton("❌ Отклонить",   callback_data=f"approval:reject:{full_id}"),
+            ],
+            [
+                InlineKeyboardButton("⏳ Отложить",   callback_data=f"approval:defer:{full_id}"),
+                InlineKeyboardButton("⬅️ К списку",   callback_data="menu:approvals"),
+            ],
+        ])
+
+    await _reply(update, text, keyboard)
+
+
+async def show_approval_high_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE, approval_id: str) -> None:
+    # Expand short ID
+    data = await _get("/api/approvals?status=pending")
+    full_id = approval_id
+    if data:
+        for item in data.get("items", []):
+            if item["id"].startswith(approval_id):
+                full_id = item["id"]
+                break
+
+    detail = await _get(f"/api/approvals/{full_id}")
+    action = detail.get("action", "?") if detail else "?"
+
+    text = (
+        "🔴 <b>Подтверждение HIGH риска</b>\n\n"
+        f"Действие: <b>{action}</b>\n\n"
+        "Вы точно хотите выполнить это действие?\n"
+        "Оно помечено как <b>HIGH RISK</b> и может иметь серьёзные последствия."
+    )
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Да, выполнить", callback_data=f"approval:approve:{full_id}")],
+        [InlineKeyboardButton("❌ Нет, отменить", callback_data=f"approval:reject:{full_id}")],
+    ])
+    await _reply(update, text, keyboard)
+
+
+# ──────────────────────────────────────────────
+# 📁 Projects
+# ──────────────────────────────────────────────
+
+async def show_projects(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    data = await _get("/api/projects")
+    if not data:
+        await _reply(update, "❌ Не удалось загрузить проекты.", kb_back())
+        return
+
+    items = data.get("items", [])
+    if not items:
+        text = "ℹ️ <b>Проекты</b>\n\nПроектов ещё нет. Они появятся когда AI-агенты начнут работу."
+        await _reply(update, text, kb_back())
+        return
+
+    STATUS_ICONS = {"active": "🟢", "paused": "🟡", "completed": "✅", "error": "🔴"}
+    lines = ["📁 <b>Проекты</b>\n"]
+    buttons = []
+
+    for p in items[:10]:
+        icon = STATUS_ICONS.get(p.get("status", ""), "⭕")
+        name = p.get("name", "?")
+        desc = (p.get("description") or "")[:50]
+        lines.append(f"{icon} <b>{name}</b>\n   {desc}")
+        pid = p.get("id", "")
+        if pid:
+            buttons.append([
+                InlineKeyboardButton(f"👁 {name[:20]}",    callback_data=f"menu:project:{pid[:8]}"),
+                InlineKeyboardButton("📋 Задачи",         callback_data=f"menu:tasks"),
+            ])
+
+    buttons.append(kb_back_row())
+    await _reply(update, "\n".join(lines), InlineKeyboardMarkup(buttons))
+
+
+# ──────────────────────────────────────────────
+# 🧠 Memory
+# ──────────────────────────────────────────────
+
+async def show_memory(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    data = await _get("/api/memory/notes")
+
+    total = data.get("total", 0) if data else 0
+    notes = data.get("notes", []) if data else []
+
+    sections: dict[str, int] = {}
+    for note in notes:
+        section = note.split("/")[0] if "/" in note else "Корень"
+        sections[section] = sections.get(section, 0) + 1
+
+    section_lines = "\n".join(f"  • {s}: {c} зап." for s, c in sorted(sections.items())) or "  пусто"
+
+    text = (
+        "🧠 <b>Память системы</b>\n\n"
+        "Здесь хранятся важные заметки, решения, настройки "
+        "и история работы AI-агентов.\n\n"
+        f"<b>Всего записей:</b> {total}\n\n"
+        f"<b>По разделам:</b>\n{section_lines}"
+    )
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🔎 Найти запись",     callback_data="menu:memory:search"),
+            InlineKeyboardButton("📋 Последние записи", callback_data="menu:memory:recent"),
+        ],
+        [
+            InlineKeyboardButton("➕ Добавить запись",  callback_data="menu:memory:add"),
+            InlineKeyboardButton("🔄 Обновить",         callback_data="menu:memory"),
+        ],
+        kb_back_row(),
+    ])
+    await _reply(update, text, keyboard)
+
+
+# ──────────────────────────────────────────────
+# 🔗 GitHub
+# ──────────────────────────────────────────────
+
+async def show_github(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    data = await _get("/api/github/status")
+
+    if not data:
+        text = (
+            "🔗 <b>GitHub</b>\n\n"
+            "❌ Не удалось получить статус.\n"
+            "Проверь GITHUB_TOKEN в настройках."
+        )
+        await _reply(update, text, kb_back())
+        return
+
+    configured = data.get("configured", False)
+    user = data.get("user", "не настроен")
+    repo = data.get("repo", "?")
+
+    text = (
+        "🔗 <b>GitHub</b>\n\n"
+        f"<b>Статус:</b> {'✅ Подключён' if configured else '❌ Не настроен'}\n"
+        f"<b>Аккаунт:</b> {user}\n"
+        f"<b>Репозиторий:</b> {repo}\n\n"
+        f"{'Готов к работе.' if configured else '⚠️ Установи GITHUB_TOKEN в .env'}"
+    )
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Проверить GitHub", callback_data="menu:github")],
+        [
+            InlineKeyboardButton("⬆️ Отправить (push)", callback_data="github:push"),
+            InlineKeyboardButton("⬇️ Получить (pull)",  callback_data="github:pull"),
+        ],
+        [InlineKeyboardButton("📜 История коммитов",   callback_data="github:history")],
+        kb_back_row(),
+    ])
+    await _reply(update, text, keyboard)
+
+
+# ──────────────────────────────────────────────
+# 📜 Logs
+# ──────────────────────────────────────────────
+
+async def show_logs_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    text = (
+        "📜 <b>Логи системы</b>\n\n"
+        "Выберите, что посмотреть:"
+    )
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("❌ Последние ошибки",  callback_data="menu:logs:errors")],
+        [InlineKeyboardButton("🤖 Логи бота",         callback_data="menu:logs:bot")],
+        [InlineKeyboardButton("🧠 Логи агентов",      callback_data="menu:logs:agents")],
+        [InlineKeyboardButton("🌐 Логи API",          callback_data="menu:logs:api")],
+        kb_back_row(),
+    ])
+    await _reply(update, text, keyboard)
+
+
+async def show_logs_agent(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    data = await _get("/api/logs/agent?limit=20")
+    if not data:
+        await _reply(update, "❌ Не удалось получить логи агентов.", InlineKeyboardMarkup([kb_back_row()]))
+        return
+
+    items = data.get("items", [])
+    if not items:
+        await _reply(update, "ℹ️ Логов агентов нет.", InlineKeyboardMarkup([kb_back_row()]))
+        return
+
+    lines = ["🧠 <b>Логи агентов</b>\n"]
+    for log in items[:15]:
+        ts = (log.get("timestamp") or "")[:16]
+        agent = log.get("agent_name", "?")
+        action = (log.get("action") or "")[:40]
+        result = (log.get("result") or "")[:30]
+        lines.append(f"<code>{ts}</code> [{agent}] {action} → {result}")
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Обновить", callback_data="menu:logs:agents")],
+        kb_back_row(),
+    ])
+    await _reply(update, "\n".join(lines), keyboard)
+
+
+async def show_logs_errors(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["docker", "logs", "--tail=30", "dimentos_api"],
+            capture_output=True, text=True, timeout=10,
+        )
+        raw = result.stderr or result.stdout or ""
+        errors = [l for l in raw.splitlines() if "ERROR" in l or "error" in l.lower()][-20:]
+        if not errors:
+            text = "✅ <b>Последние ошибки</b>\n\nОшибок не найдено."
+        else:
+            text = "❌ <b>Последние ошибки</b>\n\n<code>" + "\n".join(errors[-15:])[:3000] + "</code>"
+    except Exception as e:
+        text = f"❌ Не удалось прочитать логи: {e}"
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Обновить", callback_data="menu:logs:errors")],
+        kb_back_row(),
+    ])
+    await _reply(update, text, keyboard)
+
+
+async def show_logs_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["docker", "logs", "--tail=30", "dimentos_bot"],
+            capture_output=True, text=True, timeout=10,
+        )
+        raw = (result.stdout or "") + (result.stderr or "")
+        lines = raw.splitlines()[-25:]
+        text = "🤖 <b>Логи бота</b>\n\n<code>" + "\n".join(lines)[:3000] + "</code>"
+    except Exception as e:
+        text = f"❌ Не удалось прочитать логи бота: {e}"
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Обновить", callback_data="menu:logs:bot")],
+        kb_back_row(),
+    ])
+    await _reply(update, text, keyboard)
+
+
+async def show_logs_api(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["docker", "logs", "--tail=30", "dimentos_api"],
+            capture_output=True, text=True, timeout=10,
+        )
+        raw = (result.stdout or "") + (result.stderr or "")
+        lines = raw.splitlines()[-25:]
+        text = "🌐 <b>Логи API</b>\n\n<code>" + "\n".join(lines)[:3000] + "</code>"
+    except Exception as e:
+        text = f"❌ Не удалось прочитать логи API: {e}"
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Обновить", callback_data="menu:logs:api")],
+        kb_back_row(),
+    ])
+    await _reply(update, text, keyboard)
+
+
+# ──────────────────────────────────────────────
+# ⚙️ Settings
+# ──────────────────────────────────────────────
+
+async def show_settings(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    providers = settings.available_providers
+    text = (
+        "⚙️ <b>Настройки</b>\n\n"
+        f"<b>Домен:</b> {settings.domain}\n"
+        f"<b>API порт:</b> {settings.api_port}\n"
+        f"<b>Лог уровень:</b> {settings.log_level}\n"
+        f"<b>GitHub:</b> {settings.github_user or 'не настроен'}\n\n"
+        f"<b>AI провайдеры ({len(providers)}):</b>\n"
+        + "\n".join(f"  • {p}" for p in providers)
+        + ("\n\n<i>Токены и пароли скрыты в целях безопасности.</i>" if providers else "\n\n⚠️ Нет активных AI провайдеров.")
+    )
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🤖 AI-модели",     callback_data="menu:settings:ai")],
+        [InlineKeyboardButton("🔐 Безопасность",  callback_data="menu:settings:security")],
+        [InlineKeyboardButton("🔔 Уведомления",   callback_data="menu:settings:notify")],
+        kb_back_row(),
+    ])
+    await _reply(update, text, keyboard)
+
+
+async def show_settings_ai(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    data = await _get("/api/ai/status")
+    if not data:
+        await _reply(update, "❌ AI статус недоступен.", kb_back())
+        return
+
+    providers = data.get("providers", [])
+    models = data.get("default_models", {})
+    priority = data.get("priority_order", [])
+    free_models = data.get("openrouter_free_models", [])
+
+    lines = ["🤖 <b>AI-модели</b>\n"]
+    for p in priority:
+        m = models.get(p, "?")
+        lines.append(f"  • <b>{p}</b>: <code>{m}</code>")
+
+    if free_models:
+        lines.append("\n<b>Бесплатные модели OpenRouter:</b>")
+        for m in free_models[:4]:
+            lines.append(f"  • <code>{m}</code>")
+
+    if not providers:
+        lines.append("\n⚠️ Ни один провайдер не настроен!\nДобавь ключи в .env файл.")
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Обновить", callback_data="menu:settings:ai")],
+        [InlineKeyboardButton("⬅️ Настройки", callback_data="menu:settings")],
+        kb_back_row(),
+    ])
+    await _reply(update, "\n".join(lines), keyboard)
+
+
+# ──────────────────────────────────────────────
+# ❓ Help
+# ──────────────────────────────────────────────
+
+async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    text = (
+        "❓ <b>Помощь</b>\n\n"
+        "Этот бот нужен для управления <b>Dimentos AI Studio OS</b>.\n\n"
+        "<b>Что можно делать:</b>\n"
+        "🟢 Проверять состояние системы\n"
+        "📋 Смотреть задачи AI-агентов\n"
+        "🤖 Управлять AI-агентами\n"
+        "✅ Подтверждать или отклонять важные действия\n"
+        "📁 Смотреть проекты\n"
+        "📜 Смотреть ошибки и логи\n"
+        "🔗 Проверять статус GitHub\n"
+        "🧠 Работать с памятью системы\n\n"
+        "<b>Начните с:</b>\n"
+        "• <b>Состояние системы</b> — всё ли работает?\n"
+        "• <b>Подтверждения</b> — ждёт ли AI вашего решения?\n\n"
+        "<b>Главные команды:</b>\n"
+        "<code>/task</code> — поставить задачу агенту (зарабатывает для вас)\n"
+        "<code>/ai</code> — быстрый вопрос к AI\n"
+        "<code>/approve</code> — подтвердить действие агента\n"
+        "<code>/status</code> — состояние системы"
+    )
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🟢 Состояние системы", callback_data="menu:status"),
+            InlineKeyboardButton("✅ Подтверждения",      callback_data="menu:approvals"),
+        ],
+        kb_back_row(),
+    ])
+    await _reply(update, text, keyboard)
+
+
+# ──────────────────────────────────────────────
+# Main callback dispatcher
+# ──────────────────────────────────────────────
+
+async def handle_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Routes all menu:* callbacks to the correct handler."""
+    query = update.callback_query
+    if not query:
+        return
+
+    # Security check
+    if update.effective_user and update.effective_user.id != settings.telegram_owner_id:
+        await query.answer("⛔ Доступ запрещён.")
+        return
+
+    await query.answer()
+
+    data = query.data  # e.g. "menu:status", "menu:logs:errors", "task:stop:id123"
+    parts = data.split(":", 3)  # max 4 parts
+    prefix = parts[0]  # "menu", "task", "agent", "github"
+
+    # Handle non-menu prefixes
+    if prefix == "task":
+        action = parts[1] if len(parts) > 1 else ""
+        tid = parts[2] if len(parts) > 2 else ""
+        if action == "stop":
+            await _reply(update, f"⏸ Задача <code>{tid}</code> остановлена (не реализовано).", kb_back())
+        elif action == "retry":
+            await _reply(update, f"🔁 Задача <code>{tid}</code> перезапущена (не реализовано).", kb_back())
+        elif action == "delete":
+            await _reply(update, f"🗑 Задача <code>{tid}</code> удалена (не реализовано).", kb_back())
+        return
+
+    if prefix == "agent":
+        action = parts[1] if len(parts) > 1 else ""
+        agent_name = parts[2] if len(parts) > 2 else ""
+        if action == "run":
+            result_data = await _post(f"/api/agents/{agent_name}/run", {"task": "manual_trigger", "params": {}})
+            if result_data:
+                await _reply(update, f"▶️ Агент <b>{agent_name}</b> запущен.\n\nРезультат: <code>{str(result_data)[:200]}</code>", kb_back())
+            else:
+                await _reply(update, f"❌ Не удалось запустить агента <b>{agent_name}</b>.", kb_back())
+        return
+
+    if prefix == "github":
+        action = parts[1] if len(parts) > 1 else ""
+        await _handle_github_action(update, context, action)
+        return
+
+    # Default: menu: prefix
+    section = parts[1] if len(parts) > 1 else "main"
+
+    if section == "main":
+        await show_main_menu(update, context)
+
+    elif section == "status":
+        await show_status(update, context)
+
+    elif section == "tasks":
+        await show_tasks(update, context)
+
+    elif section == "task" and len(parts) >= 3:
+        await show_task_detail(update, context, parts[2])
+
+    elif section == "agents":
+        await show_agents(update, context)
+
+    elif section == "approvals":
+        await show_approvals(update, context)
+
+    elif section == "approval":
+        if len(parts) >= 4 and parts[2] == "confirm_high":
+            await show_approval_high_confirm(update, context, parts[3])
+        elif len(parts) >= 3:
+            await show_approval_detail(update, context, parts[2])
+        else:
+            await show_approvals(update, context)
+
+    elif section == "projects":
+        await show_projects(update, context)
+
+    elif section == "memory":
+        sub = parts[2] if len(parts) > 2 else None
+        if sub == "recent":
+            await show_memory_recent(update, context)
+        elif sub == "search":
+            await query.message.reply_text(
+                "🔎 <b>Поиск по памяти</b>\n\nОтправьте запрос командой:\n<code>/memory search &lt;текст&gt;</code>",
+                parse_mode="HTML",
+            )
+        elif sub == "add":
+            await query.message.reply_text(
+                "➕ <b>Добавить запись</b>\n\nОтправьте запрос командой:\n<code>/memory add &lt;заголовок&gt; &lt;текст&gt;</code>",
+                parse_mode="HTML",
+            )
+        else:
+            await show_memory(update, context)
+
+    elif section == "github":
+        sub = parts[2] if len(parts) > 2 else None
+        if sub == "push":
+            await _handle_github_action(update, context, "push")
+        elif sub == "pull":
+            await _handle_github_action(update, context, "pull")
+        elif sub == "history":
+            await _handle_github_action(update, context, "history")
+        else:
+            await show_github(update, context)
+
+    elif section == "logs":
+        sub = parts[2] if len(parts) > 2 else None
+        if sub == "errors":
+            await show_logs_errors(update, context)
+        elif sub == "bot":
+            await show_logs_bot(update, context)
+        elif sub == "agents":
+            await show_logs_agent(update, context)
+        elif sub == "api":
+            await show_logs_api(update, context)
+        else:
+            await show_logs_menu(update, context)
+
+    elif section == "settings":
+        sub = parts[2] if len(parts) > 2 else None
+        if sub == "ai":
+            await show_settings_ai(update, context)
+        elif sub == "security":
+            await _reply(update, "🔐 <b>Безопасность</b>\n\nВладелец: <code>настроен</code>\nAccess denied для всех чужих пользователей: <b>включено</b>", kb_back())
+        elif sub == "notify":
+            await _reply(update, "🔔 <b>Уведомления</b>\n\nТелеграм-уведомления: <b>включены</b>\nApproval flow: <b>включён</b>", kb_back())
+        else:
+            await show_settings(update, context)
+
+    elif section == "help":
+        await show_help(update, context)
+
+    else:
+        await show_main_menu(update, context)
+
+
+async def show_memory_recent(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    data = await _get("/api/memory/notes")
+    if not data:
+        await _reply(update, "❌ Память недоступна.", kb_back())
+        return
+
+    notes = data.get("notes", [])[:10]
+    if not notes:
+        await _reply(update, "ℹ️ Записей нет.", kb_back())
+        return
+
+    lines = ["📋 <b>Последние записи памяти</b>\n"]
+    for note in notes:
+        lines.append(f"  • <code>{note}</code>")
+
+    await _reply(update, "\n".join(lines), InlineKeyboardMarkup([
+        [InlineKeyboardButton("⬅️ Память", callback_data="menu:memory")],
+        kb_back_row(),
+    ]))
+
+
+async def _handle_github_action(update: Update, context: ContextTypes.DEFAULT_TYPE, action: str) -> None:
+    ACTION_LABELS = {"push": "отправить изменения", "pull": "получить изменения", "history": "историю"}
+    label = ACTION_LABELS.get(action, action)
+    # These actions require approval
+    data = await _post("/api/approvals/create", {
+        "agent": "github_agent",
+        "action": f"github_{action}",
+        "description": f"Запрос на GitHub: {label}",
+        "risk_level": "MEDIUM",
+    })
+    if data:
+        await _reply(update, f"⚠️ Запрос на подтверждение создан.\n\nДействие: <b>{label}</b>\nID: <code>{data.get('id', '?')[:8]}...</code>\n\nПроверьте раздел ✅ Подтверждения.", kb_back())
+    else:
+        await _reply(update, "❌ Не удалось создать запрос.", kb_back())
